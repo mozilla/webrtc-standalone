@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>gUM Video</title>
+
+</head>
+<body>
+<div id="main">
+  <div id="controls">
+    <input id="button" value="Start" type="button" onclick="clicked();"><span id="message"></span>
+  </div>
+  <div id="content"></div>
+</div>
+</body>
+<script type="application/javascript">
+var content = document.getElementById("content")
+  , message = document.getElementById("message")
+  , button = document.getElementById("button")
+  , video = document.createElement("video")
+  , video_playing = false
+  , videoStream
+  , PeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection
+  , SessionDescription = window.RTCSessionDescription || window.mozRTCSessionDescription || window.webkitRTCSessionDescription
+  , signal = new XMLHttpRequest()
+  , log = function (str) { window.console.log(str); }
+  , pc = new PeerConnection(null)
+  , error = function(err) { message.innerHTML = "<p>" + err + "</p>"; }
+  ;
+
+window.navigator.GetUserMedia = window.navigator.GetUserMedia || window.navigator.mozGetUserMedia || window.navigator.webkitGetUserMedia
+
+signal.open("PUT", "", true);
+log("open: PUT");
+signal.onreadystatechange = function () {
+  if (signal.readyState === 0) { log("UNSENT"); }
+  else if (signal.readyState === 1) { log("OPENED"); }
+  else if (signal.readyState === 2) { log("HEADERS_RECEIVED"); }
+  else if (signal.readyState === 3) { log("LOADING"); }
+  else if (signal.readyState === 4) {
+    log("DONE");
+    pc.setRemoteDescription(new SessionDescription(JSON.parse(signal.responseText)), function() {
+      log("response: " + signal.responseText);
+    }, error);
+  }
+  else { log("Unknown state: " + signal.readState); }
+};
+
+if (window.RTCPeerConnection) {
+  log("window.RTCPeerConnection");
+}
+if (window.mozRTCPeerConnection) {
+  log("window.mozRTCPeerConnection");
+}
+if (window.webkitRTCPeerConnection) {
+  log("window.webkitRTCPeerConnection");
+}
+
+message.innerHTML = "<p>READY</p>";
+video.setAttribute("width", 320);
+video.setAttribute("height", 240);
+
+try {
+window.navigator.GetUserMedia({video:true}, function(stream) {
+  videoStream = stream;
+
+  pc.addStream(stream);
+
+  pc.createOffer(function(offer) {
+    pc.setLocalDescription(new SessionDescription(offer), function() {
+      // send the offer to a server to be forwarded the friend you're calling.
+      log('send: ' + JSON.stringify(offer));
+      signal.send(JSON.stringify(offer));
+      log('sent');
+    }, error);
+  }, error);
+}, error);
+} catch(e) { error(e); }
+
+function clicked() {
+  if (video_playing) {
+//    video.mozSrcObject.stop();
+//    video.mozSrcObject = null;
+    video.pause();
+    if (videoStream) { videoStream.stop(); }
+    content.removeChild(video);
+    video_playing = false;
+    button.value = "Start";
+  } else if (videoStream) {
+    button.value = "Stop";
+    video.src = window.URL.createObjectURL(videoStream);
+    video.play();
+    content.appendChild(video);
+    video_playing = true;
+  }
+}
+</script>
+</html>
