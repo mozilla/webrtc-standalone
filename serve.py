@@ -15,7 +15,7 @@ except ImportError:
 from subprocess import Popen, PIPE
 
 
-pc = Popen(['/Volumes/fennec/gecko-desktop/obj-x86_64-apple-darwin12.5.0/media/webrtc/signaling/test/testapp',], stdout=PIPE, stdin=PIPE)
+pc = Popen([os.getenv('TESTAPP_DIR', "") + '/testapp',], stdout=PIPE, stdin=PIPE)
 
 class PeerConnectionTestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
@@ -224,6 +224,6 @@ try:
 except KeyboardInterrupt:
     pass
 
-print("EXIT")
+print("\nEXIT")
 pc.stdin.write("EXIT\n")
 httpd.server_close()
