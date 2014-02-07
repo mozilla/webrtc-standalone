@@ -16,7 +16,6 @@
 #include "ssl.h"
 #include "prthread.h"
 
-#include "FakePCObserver.h"
 #include "FakeMediaStreams.h"
 #include "FakeMediaStreamsImpl.h"
 #include "cpr_stdlib.h"
@@ -33,6 +32,7 @@
 #include "nsNetUtil.h"
 #include "nsIIOService.h"
 #include "nsIDNSService.h"
+#include "nsITimer.h"
 #include "nsWeakReference.h"
 #include "nsXPCOM.h"
 #include "nsXULAppAPI.h"
@@ -45,16 +45,17 @@
 
 #include <stdio.h>
 
+
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
 #define REPLY(format, ...) \
   fprintf(stdout, format, ##__VA_ARGS__); \
   fprintf(stdout, "\n"); \
   fflush(stdout);
 
-class PCObserver : public PeerConnectionObserverExternal
+class PCObserver : public PeerConnectionObserverExternal, public nsITimerCallback
 {
 public:
-  PCObserver(sipcc::PeerConnectionImpl* aPc) : mPc(aPc) {}
+  PCObserver(sipcc::PeerConnectionImpl* aPc) : mPc(aPc), mStream(nullptr) {}
 
   NS_DECL_THREADSAFE_ISUPPORTS
   NS_IMETHODIMP OnCreateOfferSuccess(const char* offer, ER&);
@@ -77,11 +78,15 @@ public:
   NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&);
   NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&);
 
+  // nsITimerCallback
+  NS_IMETHOD Notify(nsITimer *timer);
+
 protected:
   sipcc::PeerConnectionImpl* mPc;
+  nsIDOMMediaStream* mStream;
 };
 
-NS_IMPL_ISUPPORTS1(PCObserver, nsISupportsWeakReference)
+NS_IMPL_ISUPPORTS2(PCObserver, nsISupportsWeakReference, nsITimerCallback)
 
 NS_IMETHODIMP
 PCObserver::OnCreateOfferSuccess(const char* offer, ER&)
@@ -192,7 +197,6 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SdpState:
-    std::cout << "SDP State: " << std::endl;
     // NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SipccState:
@@ -215,12 +219,16 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
 NS_IMETHODIMP
 PCObserver::OnAddStream(nsIDOMMediaStream *stream, ER&)
 {
+  LOG("Add stream %p\n", (void*)stream);
+  mStream = stream;
   return NS_OK;
 }
 
 NS_IMETHODIMP
 PCObserver::OnRemoveStream(ER&)
 {
+  LOG("Remove stream %p\n", (void*)mStream);
+  mStream = 0;
   return NS_OK;
 }
 NS_IMETHODIMP
@@ -252,6 +260,20 @@ PCObserver::OnAddIceCandidateSuccess(ER&)
 NS_IMETHODIMP
 PCObserver::OnAddIceCandidateError(uint32_t code, const char *message, ER&)
 {
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PCObserver::Notify(nsITimer *timer)
+{
+  Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mStream);
+  if (fake) {
+    Fake_MediaStream* ms = reinterpret_cast<Fake_MediaStream*>(fake->GetStream());
+    static uint64_t value = 0;
+    if (ms) {
+      ms->NotifyPull(nullptr, value++);
+    }
+  }
   return NS_OK;
 }
 
@@ -395,6 +417,12 @@ main(int argc, char *argv[]) {
   NSS_SetDomesticPolicy();
   nsresult rv;
 
+  nsCOMPtr<nsITimer> timer = do_CreateInstance(NS_TIMER_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    LOG("failed to create timer\n");
+    return 0;
+  }
+
   sipcc::IceConfiguration cfg;
 
   nsCOMPtr<nsIThread> thread;
@@ -420,24 +448,12 @@ main(int argc, char *argv[]) {
     return 0;
   }
 
+  timer->InitWithCallback(pco, PR_MillisecondsToInterval(30),
+                               nsITimer::TYPE_REPEATING_PRECISE);
+
   //XRE_RunAppShell();
   // while (NS_ProcessNextEvent(nullptr, false)) { LOG("ProcessNextEvent\n"); }
   while (true) { NS_ProcessNextEvent(nullptr, true); } // LOG("ProcessNextEvent\n"); }
-
-#if 0
-  for(;;) {
-    fgets(buf, ...);
-    js = JSON.parse(buf);
-
-    if (js.type == "offer") {
-
-      pc.setRemoteDescription(OFFER, js.sdp);
-    }
-    else if (js.type == "");
-
-
-#include "PeerConnectionImplEnumsBinding.cpp"
-#endif // 0
 
   return 0;
 }

@@ -1,0 +1,5 @@
+.geckopaths
+testapp
+testapp.o
+build/*.a
+.DS_Store

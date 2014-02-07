@@ -15,7 +15,7 @@ except ImportError:
 from subprocess import Popen, PIPE
 
 
-pc = Popen([os.getenv('TESTAPP_DIR', "") + '/testapp',], stdout=PIPE, stdin=PIPE)
+pc = Popen([os.getenv('TESTAPP_DIR', "..") + '/testapp',], stdout=PIPE, stdin=PIPE)
 
 class PeerConnectionTestRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
