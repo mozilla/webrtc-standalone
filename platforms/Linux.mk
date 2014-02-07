@@ -103,9 +103,8 @@ LFLAGS = \
 -lnspr4 \
 -lplc4 \
 -lplds4 \
--Wl,--whole-archive \
 -Wl,--no-whole-archive \
+$(GECKO_OBJ)/dist/lib/libmemory.a \
 -rdynamic \
 -ldl
-
 
