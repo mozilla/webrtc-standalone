@@ -36,7 +36,7 @@ libmozz.a
 LIBS = $(addprefix $(BUILD_DIR)/, $(LIBNAMES))
 
 testapp: $(BUILD_DIR)/testapp.o $(LIBS)
-	$(CXX) $< $(LIBS) $(LIBS) $(LFLAGS) -o $@
+	$(CXX) $< $(LIBS) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/testapp.o: testapp.cpp
 	@mkdir -p $(BUILD_DIR)
