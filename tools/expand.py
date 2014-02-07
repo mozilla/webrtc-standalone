@@ -12,4 +12,5 @@ def expand(file):
         for item in val[2:]:
           sys.stdout.write(' ' + item)
 
-expand(sys.argv[1])
+for lib in sys.argv[1:]:
+  expand(lib)

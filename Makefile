@@ -19,35 +19,32 @@ vpath %.a ./build
 
 BUILD_DIR=./build
 
-LIBNAMES = \
-libxpcomglue_s.a \
-libmtransport_s.a \
-libecc.a \
-libsipcc.a \
-libwebrtc.a \
-libgkmedias.a \
-libnksrtp_s.a \
-libmozz.a
+LIBS = \
+$(GECKO_OBJ)/dist/lib/libxpcomglue_s.a.desc \
+$(GECKO_OBJ)/media/mtransport/standalone/libmtransport_s.a.desc \
+$(GECKO_OBJ)/media/webrtc/signalingtest/signaling_ecc/libecc.a.desc \
+$(GECKO_OBJ)/media/webrtc/signalingtest/signaling_sipcc/libsipcc.a.desc \
+$(GECKO_OBJ)/layout/media/webrtc/libwebrtc.a.desc \
+$(GECKO_OBJ)/dist/lib/libgkmedias.a.desc \
+$(GECKO_OBJ)/netwerk/srtp/src/libnksrtp_s.a.desc \
+$(GECKO_OBJ)/modules/zlib/src/libmozz.a.desc
+
+LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
 
-# /home/randall/src/gecko-desktop/obj-x86_64-unknown-linux-gnu/dist/lib/libmozglue.a \
-# /home/randall/src/gecko-desktop/obj-x86_64-unknown-linux-gnu/dist/lib/libmemory.a \
-
-LIBS = $(addprefix $(BUILD_DIR)/, $(LIBNAMES))
-
-testapp: $(BUILD_DIR)/testapp.o $(LIBS)
-	$(CXX) $< $(LIBS) $(LFLAGS) -o $@
+testapp: $(BUILD_DIR)/testapp.o $(LIB_ROLLUP)
+	$(CXX) $< $(LIB_ROLLUP) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/testapp.o: testapp.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CFLAGS) $(INCLUDE) $^ -c -o $@
 
-$(BUILD_DIR)/%.a : %.a.desc
+$(LIB_ROLLUP): $(LIBS)
 	@mkdir -p $(BUILD_DIR)
-	$(AR) cr $@ `python ./tools/expand.py $<`
+	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIBS) $(BUILD_DIR)/testapp.o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/testapp.o
 
 clobber: clean
 	rm -f testapp

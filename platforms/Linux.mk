@@ -106,7 +106,6 @@ LFLAGS = \
 -Wl,--whole-archive \
 -Wl,--no-whole-archive \
 -rdynamic \
--ldl \
--lc
+-ldl
 
 
