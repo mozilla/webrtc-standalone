@@ -1,5 +1,5 @@
 .geckopaths
 testapp
 testapp.o
-build/*.a
+build
 .DS_Store

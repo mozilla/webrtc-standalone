@@ -1,6 +1,6 @@
 -include .geckopaths
-GECKO_ROOT := /Volumes/fennec/gecko-desktop
-GECKO_OBJ := $(GECKO_ROOT)/obj-x86_64-apple-darwin12.5.0
+#GECKO_ROOT := /Volumes/fennec/gecko-desktop
+#GECKO_OBJ := $(GECKO_ROOT)/obj-x86_64-apple-darwin12.5.0
 
 INCLUDE = \
 -I$(GECKO_ROOT)/media/webrtc/signaling/test \
@@ -61,7 +61,6 @@ CFLAGS = \
 -include $(GECKO_OBJ)/mozilla-config.h \
 -MD \
 -MP \
--MF \
 -Wall \
 -Wpointer-arith \
 -Woverloaded-virtual \
@@ -90,7 +89,6 @@ CFLAGS = \
 LFLAGS = \
 -L$(GECKO_OBJ)/dist/bin \
 -L$(GECKO_OBJ)/dist/lib \
--Qunused-arguments \
 -Qunused-arguments \
 -Wall \
 -Wpointer-arith \
@@ -170,7 +168,9 @@ vpath %.a.desc $(GECKO_OBJ)/modules/zlib/src
 
 vpath %.a ./build
 
-LIBS = \
+BUILD_DIR=./build
+
+LIBNAMES = \
 libxpcomglue_s.a \
 libmtransport_s.a \
 libecc.a \
@@ -180,12 +180,22 @@ libgkmedias.a \
 libnksrtp_s.a \
 libmozz.a
 
-testapp: testapp.o $(LIBS)
-	$(CXX) $^ $(LFLAGS) -o $@
+LIBS = $(addprefix $(BUILD_DIR)/, $(LIBNAMES))
 
-testapp.o: testapp.cpp
+testapp: $(BUILD_DIR)/testapp.o $(LIBS)
+	$(CXX) $< $(LIBS) $(LFLAGS) -o $@
+
+$(BUILD_DIR)/testapp.o: testapp.cpp
+	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CFLAGS) $(INCLUDE) $^ -c -o $@
 
-%.a : %.a.desc
-	@echo $<
-	$(AR) cr build/$@ `python ./tools/expand.py $<`
+$(BUILD_DIR)/%.a : %.a.desc
+	@mkdir -p $(BUILD_DIR)
+	$(AR) cr $@ `python ./tools/expand.py $<`
+
+clean:
+	rm -f $(LIBS) $(BUILD_DIR)/testapp.o
+
+clobber: clean
+	rm -f testapp
+	rm -rf $(BUILD_DIR)
