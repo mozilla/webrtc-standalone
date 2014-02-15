@@ -23,10 +23,10 @@ $(GECKO_OBJ)/media/webrtc/signalingtest/signaling_sipcc/libsipcc.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
-testapp: $(BUILD_DIR)/testapp.o $(LIB_ROLLUP)
-	$(CXX) $< $(LIB_ROLLUP) $(LFLAGS) -o $@
+testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP)
+	$(CXX) $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP) $(LFLAGS) -o $@
 
-$(BUILD_DIR)/testapp.o: testapp.cpp
+$(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
 	$(CXX) $(CFLAGS) $(INCLUDE) $^ -c -o $@
 
