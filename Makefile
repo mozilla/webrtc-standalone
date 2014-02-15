@@ -35,7 +35,7 @@ $(LIB_ROLLUP): $(LIBS)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/testapp.o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o
 
 clobber: clean
 	rm -f testapp
