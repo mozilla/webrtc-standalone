@@ -42,7 +42,7 @@ CFLAGS = \
 -fomit-frame-pointer
 
 LFLAGS = \
--L$(GECKO_OBJ)/dist/bin \
+-L$(GECKO_OBJ)/dist/sdk/lib \
 -L$(GECKO_OBJ)/dist/lib \
 -Qunused-arguments \
 -Wall \
@@ -78,14 +78,16 @@ LFLAGS = \
 -framework ExceptionHandling \
 -Wl,-executable_path,$(GECKO_OBJ)/dist/bin \
 -Wl,-dead_strip \
-$(GECKO_OBJ)/dist/bin/XUL \
+$(GECKO_OBJ)/dist/sdk/lib/XUL \
+-lcrmf \
+-lnss3 \
+-lunicharutil_external_s \
+-lxpcomglue_s \
 -lnspr4 \
 -lplc4 \
 -lplds4 \
--lcrmf \
 -lsmime3 \
 -lssl3 \
--lnss3 \
 -lnssutil3 \
 -framework AudioToolbox \
 -framework AudioUnit \
@@ -107,9 +109,6 @@ $(GECKO_OBJ)/dist/bin/XUL \
 -framework AudioUnit \
 -framework AddressBook \
 -framework OpenGL \
--lnspr4 \
--lplc4 \
--lplds4 \
 -lmozglue \
 -lmozalloc
 

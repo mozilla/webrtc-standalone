@@ -3,7 +3,7 @@ if [ "$GECKO_BIN_DIR" = "" ] ; then
   GECKO_BIN_DIR=/Volumes/fennec/gecko-desktop/obj-x86_64-apple-darwin12.5.0
 fi
 if [ "$TESTAPP_PATH" = "" ] ; then
-  export TESTAPP_DIR=$GECKO_BIN_DIR/dist/bin
+  export TESTAPP_DIR=..
 fi
 if [ "$GECKO_DIST_BIN" = "" ] ; then
   GECKO_DIST_BIN=$GECKO_BIN_DIR/dist/bin
