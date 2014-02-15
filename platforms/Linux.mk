@@ -1,6 +1,7 @@
 CFLAGS = \
 -I$(GECKO_OBJ)/dist/stl_wrappers -I$(GECKO_OBJ)/dist/system_wrappers \
 -include $(GECKO_ROOT)/config/gcc_hidden.h \
+-DDEBUG -D_DEBUG -DTRACING \
 -DOS_POSIX=1 \
 -DOS_LINUX=1 \
 -DUSE_FAKE_MEDIA_STREAMS \
@@ -68,21 +69,22 @@ LFLAGS = \
 -Wl,-z,noexecstack \
 -Wl,-z,text \
 -Wl,--build-id \
--B /home/randall/src/gecko-desktop/obj-x86_64-unknown-linux-gnu/build/unix/gold \
--Wl,-rpath-link,/home/randall/src/gecko-desktop/obj-x86_64-unknown-linux-gnu/dist/bin \
+-B $(GECKO_OBJ)/build/unix/gold \
+-Wl,-rpath-link,$(GECKO_OBJ)/dist/bin \
 -Wl,-rpath-link,/usr/local/lib \
+-L$(GECKO_OBJ)/dist/sdk/lib \
 -lxul \
 -lmozalloc \
+-lcrmf \
 -lnspr4 \
 -lplc4 \
 -lplds4 \
--L$(GECKO_OBJ)/dist/bin \
--L$(GECKO_OBJ)/dist/lib \
--lcrmf \
--lsmime3 \
--lssl3 \
 -lnss3 \
 -lnssutil3 \
+-lsmime3 \
+-lssl3 \
+-lplds4 \
+-lxpcomglue_s \
 -lasound \
 -lX11 \
 -lgtk-x11-2.0 \
@@ -100,11 +102,10 @@ LFLAGS = \
 -lglib-2.0 \
 -lgthread-2.0 \
 -lXrender \
--lnspr4 \
--lplc4 \
--lplds4 \
+-Wl,--whole-archive \
+-lmemory \
+-lmozglue \
 -Wl,--no-whole-archive \
-$(GECKO_OBJ)/dist/lib/libmemory.a \
 -rdynamic \
 -ldl
 

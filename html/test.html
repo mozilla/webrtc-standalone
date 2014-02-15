@@ -38,6 +38,7 @@ signal.onreadystatechange = function () {
   else if (signal.readyState === 3) { log("LOADING"); }
   else if (signal.readyState === 4) {
     log("DONE");
+    log(signal.responseText);
     pc.setRemoteDescription(new SessionDescription(JSON.parse(signal.responseText)), function() {
       log("response: " + signal.responseText);
     }, error);

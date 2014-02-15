@@ -1,50 +1,29 @@
-#include <iostream>
-#include <map>
-#include <algorithm>
+#include <queue>
 #include <string>
+#include <sstream>
+
+#include <errno.h>
+#include <fcntl.h>           // For O_* constants
+#include <semaphore.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>        // For mode constants
 #include <unistd.h>
 
 #include "base/basictypes.h"
-#include "logging.h"
-
-#define GTEST_HAS_RTTI 0
-#include "gtest/gtest.h"
-#include "gtest_utils.h"
-
-#include "nspr.h"
-#include "nss.h"
-#include "ssl.h"
-#include "prthread.h"
-
 #include "FakeMediaStreams.h"
 #include "FakeMediaStreamsImpl.h"
-#include "cpr_stdlib.h"
-#include "PeerConnectionImpl.h"
-#include "PeerConnectionCtx.h"
-#include "PeerConnectionMedia.h"
-#include "MediaPipeline.h"
-#include "runnable_utils.h"
-#include "nsServiceManagerUtils.h"
-#include "mozilla/Services.h"
-#include "base/message_loop.h"
-#include "nsIPrefService.h"
-#include "nsIPrefBranch.h"
-#include "nsNetUtil.h"
-#include "nsIIOService.h"
-#include "nsIDNSService.h"
+#include "mozilla/Mutex.h"
+#include "mozilla/unused.h"
+#include "nss.h"
+#include "nsISupportsImpl.h"
 #include "nsITimer.h"
 #include "nsWeakReference.h"
 #include "nsXPCOM.h"
-#include "nsXULAppAPI.h"
-#include "nricectx.h"
-#include "rlogringbuffer.h"
-#include "mozilla/SyncRunnable.h"
-#include "logging.h"
-#include "stunserver.h"
-#include "stunserver.cpp"
-
-#include <stdio.h>
-
+#include "PeerConnectionImpl.h"
+#include "PeerConnectionCtx.h"
+#include "ssl.h"
+#include "VideoSegmentEx.h"
 
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
 #define REPLY(format, ...) \
@@ -52,75 +31,297 @@
   fprintf(stdout, "\n"); \
   fflush(stdout);
 
+// START -=-=- WebRTCCall.h -=-=-
+class WebRTCCallObserver {
+public:
+  virtual void ReceiveAnswer(const std::string& aAnswer) = 0;
+  virtual void ReceiveNextVideoFrame(const unsigned char* aBuffer, const int32_t aBufferSize) = 0;
+
+protected:
+  WebRTCCallObserver() {}
+  virtual ~WebRTCCallObserver() {}
+};
+
+class WebRTCCallSystem {
+public:
+  // will be called from a thread to notify main tread that an event is ready for processing
+  virtual void NotifyNextEventReady() = 0;
+
+protected:
+  WebRTCCallSystem() {}
+  virtual ~WebRTCCallSystem() {}
+};
+
+class WebRTCCallEvent {
+public:
+  virtual ~WebRTCCallEvent() {}
+  virtual void Run() = 0;
+protected:
+  WebRTCCallEvent() {}
+};
+
+class WebRTCCall {
+public:
+  WebRTCCall();
+  WebRTCCall(WebRTCCallSystem& aSystem, WebRTCCallObserver& aObserver);
+  ~WebRTCCall();
+
+  void AddEvent(WebRTCCallEvent* event);
+
+  void ProcessNextEvent();
+
+  void RegisterSystem(WebRTCCallSystem& aSystem);
+  void ReleaseSystem(WebRTCCallSystem& aSystem);
+
+  void RegisterObserver(WebRTCCallObserver& aObserver);
+  void ReleaseObserver(WebRTCCallObserver& aObserver);
+
+  void SetOffer(const std::string& aOffer);
+  class State;
+protected:
+  nsRefPtr<State> mState;
+};
+// -=-=- END WebRTCCall.h -=-=-
+
+// -=-=- START WebRTCCall.cpp -=-=-
+namespace {
+class PCObserver;
+typedef mozilla::MutexAutoLock MutexAutoLock;
+}
+
+class WebRTCCall::State {
+public:
+  State();
+  ~State();
+
+  void AddEvent(WebRTCCallEvent* event)
+  {
+    if (event) {
+      MutexAutoLock lock(mEventsLock);
+      mEvents.push(event);
+    }
+    if (mSystem && event) {
+      mSystem->NotifyNextEventReady();
+    }
+  }
+
+  void NextEvent()
+  {
+    WebRTCCallEvent* event = nullptr;
+    {
+      MutexAutoLock lock(mEventsLock);
+      event = mEvents.front();
+      if (event) { mEvents.pop(); }
+    }
+    if (event) {
+      event->Run();
+      delete event;
+    }
+  }
+
+  bool mRunThread;
+
+  WebRTCCallSystem* mSystem;
+  WebRTCCallObserver* mCallObserver;
+  nsCOMPtr<nsIDOMMediaStream> mStream;
+  nsCOMPtr<nsIThread> mThread;
+  nsCOMPtr<nsITimer> mTimer;
+  mozilla::RefPtr<sipcc::PeerConnectionImpl> mPeerConnection;
+  nsRefPtr<PCObserver> mPeerConnectionObserver;
+
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(State);
+
+protected:
+  static void* WorkFunc(void*);
+  mozilla::Mutex mEventsLock;
+  std::queue<WebRTCCallEvent*> mEvents;
+};
+
+
+namespace {
+
+static const int32_t PCOFFER = 0;
+static const int32_t PCANSWER = 1;
+
+class CallEvent : public WebRTCCallEvent {
+public:
+  virtual ~CallEvent() {}
+protected:
+  CallEvent(const nsRefPtr<WebRTCCall::State>& aState) : mState(aState) {}
+
+  nsRefPtr<WebRTCCall::State> mState;
+};
+
+class ReceiveAnswerEvent : public CallEvent {
+public:
+  ReceiveAnswerEvent(const nsRefPtr<WebRTCCall::State>& aState, const std::string& aAnswer)
+      : CallEvent(aState)
+      , mAnswer(aAnswer) {}
+
+  virtual void Run()
+  {
+    if (mState.get() && mState->mCallObserver) {
+      mState->mCallObserver->ReceiveAnswer(mAnswer);
+    }
+  }
+protected:
+  std::string mAnswer;
+};
+
+class ReceiveNextVideoFrameEvent : public CallEvent {
+public:
+  ReceiveNextVideoFrameEvent(const nsRefPtr<WebRTCCall::State>& aState) : CallEvent(aState),  mBuffer(nullptr), mBufferSize(0) {}
+
+  virtual ~ReceiveNextVideoFrameEvent()
+  {
+    delete []mBuffer;
+    mBuffer = 0;
+  }
+
+  ReceiveNextVideoFrameEvent(
+      const nsRefPtr<WebRTCCall::State>& aState,
+      const unsigned char* aBuffer,
+      const int32_t aBufferSize)
+      : CallEvent(aState)
+      , mBuffer(nullptr)
+      , mBufferSize(aBufferSize)
+  {
+    if (aBufferSize && aBuffer) {
+      mBuffer = new unsigned char[aBufferSize];
+      if (mBuffer) {
+        memcpy((void*)mBuffer, (const void*)aBuffer, aBufferSize);
+      }
+    }
+  }
+
+  virtual void Run()
+  {
+    if (mState.get() && mState->mCallObserver) {
+      mState->mCallObserver->ReceiveNextVideoFrame(mBuffer, mBufferSize);
+    }
+  }
+protected:
+  unsigned char* mBuffer;
+  int32_t mBufferSize;
+};
+
+class StopThreadEvent : public nsIRunnable {
+public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+
+  StopThreadEvent(const nsRefPtr<WebRTCCall::State>& aState) : mState(aState) {}
+
+  NS_IMETHOD Run()
+  {
+    mState->mRunThread = false;
+    return NS_OK;
+  }
+
+  virtual ~StopThreadEvent() {}
+protected:
+  nsRefPtr<WebRTCCall::State> mState;
+};
+NS_IMPL_ISUPPORTS1(StopThreadEvent, nsIRunnable);
+
+
+class RemoteDescriptionEvent : public nsIRunnable {
+public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+
+  RemoteDescriptionEvent(
+      nsRefPtr<WebRTCCall::State>& aState,
+      const std::string& aDescription,
+      const int aAction)
+      : mState(aState)
+      , mDescription(aDescription)
+      , mAction(aAction) {}
+
+  NS_IMETHOD Run()
+  {
+    if (mState.get() && mState->mPeerConnection.get()) {
+      mState->mPeerConnection->SetRemoteDescription(mAction, mDescription.c_str());
+      if (mAction == PCOFFER) {
+        sipcc::MediaConstraintsExternal constraints;
+        mState->mPeerConnection->CreateAnswer(constraints);
+      }
+    }
+    return NS_OK;
+  }
+
+  virtual ~RemoteDescriptionEvent() {}
+protected:
+  nsRefPtr<WebRTCCall::State> mState;
+  std::string mDescription;
+  int mAction;
+};
+NS_IMPL_ISUPPORTS1(RemoteDescriptionEvent, nsIRunnable);
+
+class VideoSink : public Fake_VideoSink {
+public:
+  VideoSink(const nsRefPtr<WebRTCCall::State>& aState) : mState(aState) {}
+  virtual ~VideoSink() {}
+
+  virtual void SegmentReady( mozilla::MediaSegment* aSegment)
+  {
+    mozilla::VideoSegmentEx* segment = reinterpret_cast<mozilla::VideoSegmentEx*>(aSegment);
+    if (segment && mState) {
+      const mozilla::VideoFrameEx *frame = segment->GetLastFrame();
+      unsigned int size;
+      const unsigned char *image = frame->GetImage(&size);
+      if (size > 0) {
+          mState->AddEvent(new ReceiveNextVideoFrameEvent(mState, image, size));
+      }
+    }
+  }
+protected:
+  nsRefPtr<WebRTCCall::State> mState;
+};
+
 class PCObserver : public PeerConnectionObserverExternal, public nsITimerCallback
 {
 public:
-  PCObserver(sipcc::PeerConnectionImpl* aPc) : mPc(aPc), mStream(nullptr) {}
+  PCObserver(const nsRefPtr<WebRTCCall::State>& aState) : mState(aState) {}
 
+  // PeerConnectionObserverExternal
   NS_DECL_THREADSAFE_ISUPPORTS
-  NS_IMETHODIMP OnCreateOfferSuccess(const char* offer, ER&);
-  NS_IMETHODIMP OnCreateOfferError(uint32_t code, const char *msg, ER&);
+  NS_IMETHODIMP OnCreateOfferSuccess(const char* offer, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnCreateOfferError(uint32_t code, const char *msg, ER&) { return NS_OK; }
   NS_IMETHODIMP OnCreateAnswerSuccess(const char* answer, ER&);
   NS_IMETHODIMP OnCreateAnswerError(uint32_t code, const char *msg, ER&);
-  NS_IMETHODIMP OnSetLocalDescriptionSuccess(ER&);
-  NS_IMETHODIMP OnSetRemoteDescriptionSuccess(ER&);
-  NS_IMETHODIMP OnSetLocalDescriptionError(uint32_t code, const char *msg, ER&);
-  NS_IMETHODIMP OnSetRemoteDescriptionError(uint32_t code, const char *msg, ER&);
-  NS_IMETHODIMP NotifyConnection(ER&);
-  NS_IMETHODIMP NotifyClosedConnection(ER&);
-  NS_IMETHODIMP NotifyDataChannel(nsIDOMDataChannel *channel, ER&);
+  NS_IMETHODIMP OnSetLocalDescriptionSuccess(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnSetRemoteDescriptionSuccess(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnSetLocalDescriptionError(uint32_t code, const char *msg, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnSetRemoteDescriptionError(uint32_t code, const char *msg, ER&) { return NS_OK; }
+  NS_IMETHODIMP NotifyConnection(ER&) { return NS_OK; }
+  NS_IMETHODIMP NotifyClosedConnection(ER&) { return NS_OK; }
+  NS_IMETHODIMP NotifyDataChannel(nsIDOMDataChannel *channel, ER&) { return NS_OK; }
   NS_IMETHODIMP OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, void*);
   NS_IMETHODIMP OnAddStream(nsIDOMMediaStream *stream, ER&);
   NS_IMETHODIMP OnRemoveStream(ER&);
-  NS_IMETHODIMP OnAddTrack(ER&);
-  NS_IMETHODIMP OnRemoveTrack(ER&);
-  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&);
-  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&);
-  NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&);
+  NS_IMETHODIMP OnAddTrack(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnRemoveTrack(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&) { return NS_OK; }
 
   // nsITimerCallback
   NS_IMETHOD Notify(nsITimer *timer);
 
 protected:
-  sipcc::PeerConnectionImpl* mPc;
-  nsIDOMMediaStream* mStream;
+  nsRefPtr<WebRTCCall::State> mState;
 };
 
 NS_IMPL_ISUPPORTS2(PCObserver, nsISupportsWeakReference, nsITimerCallback)
 
 NS_IMETHODIMP
-PCObserver::OnCreateOfferSuccess(const char* offer, ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnCreateOfferError(uint32_t code, const char *message, ER&)
-{
-  return NS_OK;
-}
-
-namespace {
-static const int32_t PCOFFER = 0;
-static const int32_t PCANSWER = 1;
-}
-
-NS_IMETHODIMP
 PCObserver::OnCreateAnswerSuccess(const char* answer, ER&)
 {
-  LOG("OnCreateAnswerSuccess:\n[%s]\n", answer);
-  mPc->SetLocalDescription(PCANSWER, answer);
-  std::string out("{\"type\":\"answer\",\"sdp\":\"");
-  const char* ptr = answer;
-  while (*ptr) {
-    if (*ptr == '\n') { out += "\\n"; }
-    else if (*ptr == '\r') { out += "\\r"; }
-    else { out += *ptr; }
-    ptr++;
+  if (mState.get() && mState->mPeerConnection.get()) {
+    mState->mPeerConnection->SetLocalDescription(PCANSWER, answer);
+    std::string out(answer);
+    mState->AddEvent(new ReceiveAnswerEvent(mState, out));
   }
-  out += "\"}";
-  LOG("formatted: %s", out.c_str());
-  REPLY("%s", out.c_str());
+
   return NS_OK;
 }
 
@@ -131,50 +332,12 @@ PCObserver::OnCreateAnswerError(uint32_t code, const char *message, ER&)
 }
 
 NS_IMETHODIMP
-PCObserver::OnSetLocalDescriptionSuccess(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnSetRemoteDescriptionSuccess(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnSetLocalDescriptionError(uint32_t code, const char *message, ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnSetRemoteDescriptionError(uint32_t code, const char *message, ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::NotifyConnection(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::NotifyClosedConnection(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::NotifyDataChannel(nsIDOMDataChannel *channel, ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, void*)
 {
+  if (!mState || mState->mPeerConnection.get()) {
+    return NS_OK;
+  }
+
   nsresult rv;
   mozilla::dom::PCImplReadyState gotready;
   mozilla::dom::PCImplIceConnectionState gotice;
@@ -182,29 +345,28 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
   mozilla::dom::PCImplSipccState gotsipcc;
   mozilla::dom::PCImplSignalingState gotsignaling;
 
-  switch (state_type)
-  {
+  switch (state_type) {
   case mozilla::dom::PCObserverStateType::ReadyState:
-    rv = mPc->ReadyState(&gotready);
+    rv = mState->mPeerConnection->ReadyState(&gotready);
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::IceConnectionState:
-    rv = mPc->IceConnectionState(&gotice);
+    rv = mState->mPeerConnection->IceConnectionState(&gotice);
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::IceGatheringState:
-    rv = mPc->IceGatheringState(&goticegathering);
+    rv = mState->mPeerConnection->IceGatheringState(&goticegathering);
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SdpState:
     // NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SipccState:
-    rv = mPc->SipccState(&gotsipcc);
+    rv = mState->mPeerConnection->SipccState(&gotsipcc);
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SignalingState:
-    rv = mPc->SignalingState(&gotsignaling);
+    rv = mState->mPeerConnection->SignalingState(&gotsignaling);
     NS_ENSURE_SUCCESS(rv, rv);
     break;
   default:
@@ -219,66 +381,180 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
 NS_IMETHODIMP
 PCObserver::OnAddStream(nsIDOMMediaStream *stream, ER&)
 {
-  LOG("Add stream %p\n", (void*)stream);
-  mStream = stream;
+  mState->mStream = stream;
+
+  Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mState->mStream.get());
+  if (fake) {
+    Fake_MediaStream* ms = reinterpret_cast<Fake_MediaStream*>(fake->GetStream());
+    Fake_SourceMediaStream* sms = ms->AsSourceStream();
+    if (sms) {
+      nsRefPtr<Fake_VideoSink> sink = new VideoSink(mState);
+      sms->AddVideoSink(sink);
+    }
+  }
   return NS_OK;
 }
 
 NS_IMETHODIMP
 PCObserver::OnRemoveStream(ER&)
 {
-  LOG("Remove stream %p\n", (void*)mStream);
-  mStream = 0;
-  return NS_OK;
-}
-NS_IMETHODIMP
-PCObserver::OnAddTrack(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnRemoveTrack(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnIceCandidate(uint16_t level,
-                           const char * mid,
-                           const char * candidate, ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnAddIceCandidateSuccess(ER&)
-{
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-PCObserver::OnAddIceCandidateError(uint32_t code, const char *message, ER&)
-{
+  // Not being called?
   return NS_OK;
 }
 
 NS_IMETHODIMP
 PCObserver::Notify(nsITimer *timer)
 {
-  Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mStream);
-  if (fake) {
-    Fake_MediaStream* ms = reinterpret_cast<Fake_MediaStream*>(fake->GetStream());
-    static uint64_t value = 0;
-    if (ms) {
-      ms->NotifyPull(nullptr, value++);
+  if (mState.get()) {
+    Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mState->mStream.get());
+    if (fake) {
+      Fake_MediaStream* ms = reinterpret_cast<Fake_MediaStream*>(fake->GetStream());
+      static uint64_t value = 0;
+      if (ms) { ms->NotifyPull(nullptr, value++); }
     }
   }
   return NS_OK;
 }
 
+} // namespace
+
+WebRTCCall::WebRTCCall() : mState(new State)
+{
+  if (mState) { mState->AddRef(); }
+}
+
+WebRTCCall::WebRTCCall(WebRTCCallSystem& aSystem, WebRTCCallObserver& aObserver)
+    : mState(new State)
+{
+  if (mState) {
+    mState->AddRef();
+    mState->mSystem = &aSystem;
+    mState->mCallObserver = &aObserver;
+  }
+}
+
+WebRTCCall::~WebRTCCall()
+{
+  if (mState) {
+    if (mState->mThread.get()) {
+      nsCOMPtr<StopThreadEvent> event = new StopThreadEvent(mState);
+      mState->mThread->Dispatch(event, nsIEventTarget::DISPATCH_NORMAL);
+    }
+    mState->Release();
+    mState = nullptr;
+  }
+}
+
+void
+WebRTCCall::AddEvent(WebRTCCallEvent* event)
+{
+  if (mState) { mState->AddEvent(event); }
+  else { delete event; }
+}
+
+void
+WebRTCCall::ProcessNextEvent()
+{
+  if (mState) { mState->NextEvent(); }
+}
+
+void
+WebRTCCall::RegisterSystem(WebRTCCallSystem& aSystem)
+{
+  if (mState && !mState->mSystem) { mState->mSystem = &aSystem; }
+}
+
+void
+WebRTCCall::ReleaseSystem(WebRTCCallSystem& aSystem)
+{
+  if (mState && (mState->mSystem == &aSystem)) { mState->mSystem = nullptr; }
+}
+
+void
+WebRTCCall::RegisterObserver(WebRTCCallObserver& aObserver)
+{
+  if (mState && !mState->mCallObserver) { mState->mCallObserver = &aObserver; }
+}
+
+void
+WebRTCCall::ReleaseObserver(WebRTCCallObserver& aObserver)
+{
+  if (mState && (mState->mCallObserver == &aObserver)) { mState->mCallObserver = nullptr; }
+}
+
+void
+WebRTCCall::SetOffer(const std::string& aOffer)
+{
+  if (mState && mState->mThread.get()) {
+    nsCOMPtr<RemoteDescriptionEvent> event = new RemoteDescriptionEvent(mState, aOffer, PCOFFER);
+    mState->mThread->Dispatch(event, nsIEventTarget::DISPATCH_NORMAL);
+  }
+}
+
+WebRTCCall::State::State()
+    : mRunThread(true)
+    , mSystem(nullptr)
+    , mCallObserver(nullptr)
+    , mStream(nullptr)
+    , mEventsLock("")
+{
+  pthread_t t;
+  pthread_create(&t, nullptr, WorkFunc, static_cast<void*>(this));
+}
+
+WebRTCCall::State::~State()
+{
+  // No need to grab mutex since no one else should be accessing the State.
+  while(!mEvents.empty()) {
+    WebRTCCallEvent* event = mEvents.front();
+    mEvents.pop();
+    delete event;
+  }
+}
+
+void*
+WebRTCCall::State::WorkFunc(void* ptr)
+{
+  nsRefPtr<State> self = static_cast<State*>(ptr);
+
+  NS_InitXPCOM2(nullptr, nullptr, nullptr);
+  NSS_NoDB_Init(nullptr);
+  NSS_SetDomesticPolicy();
+  nsresult rv;
+
+  rv = NS_GetCurrentThread(getter_AddRefs(self->mThread));
+  if (NS_FAILED(rv)) {
+    LOG("failed to get current thread\n");
+    return 0;
+  }
+
+  sipcc::IceConfiguration cfg;
+
+  self->mPeerConnection = sipcc::PeerConnectionImpl::CreatePeerConnection();
+  self->mPeerConnectionObserver = new PCObserver(self);
+  self->mPeerConnection->Initialize(*(self->mPeerConnectionObserver), nullptr, cfg, self->mThread.get());
+
+  self->mTimer = do_CreateInstance(NS_TIMER_CONTRACTID, &rv);
+  if (NS_FAILED(rv)) {
+    LOG("failed to create timer\n");
+    return 0;
+  }
+
+  self->mTimer->InitWithCallback(
+      self->mPeerConnectionObserver,
+      PR_MillisecondsToInterval(30),
+      nsITimer::TYPE_REPEATING_PRECISE);
+
+  while (self->mRunThread) { NS_ProcessNextEvent(nullptr, true); }
+
+  return nullptr;
+}
+// -=-=- END WebRTCCall.cpp -=-=-
+
+// -=-=- START testapp.cpp -=-=-
+namespace {
+
 enum ActionType { OfferAction, AnswerAction, UnknownAction };
-static const int BufferSize = 2048;
 static char sOffer[] = "\"type\":\"offer";
 static char sAnswer[] = "\"type\":\"answer";
 static char sSpd[] = "\"sdp\":\"";
@@ -299,28 +575,14 @@ parse(char *sample, const int size, ActionType& type, std::string& value)
     while (*ptr != '\"' && *ptr != '\0') {
        if (escape) {
          escape = false;
-         if (*ptr == 'n') {
-           value += '\n';
-         }
-         else if (*ptr == 'r') {
-           value += '\r';
-         }
-         else if (*ptr == 't') {
-           value += '\t';
-         }
-         else if (*ptr == '\\') {
-           value += '\\';
-         }
-         else if (*ptr == '\"') {
-           value += '\"';
-         }
+         if (*ptr == 'n') { value += '\n'; }
+         else if (*ptr == 'r') { value += '\r'; }
+         else if (*ptr == 't') { value += '\t'; }
+         else if (*ptr == '\\') { value += '\\'; }
+         else if (*ptr == '\"') { value += '\"'; }
        }
-       else if (*ptr == '\\') {
-         escape = true;
-       }
-       else {
-         value += *ptr;
-       }
+       else if (*ptr == '\\') { escape = true; }
+       else { value += *ptr; }
 
        ptr++;
     }
@@ -329,131 +591,119 @@ parse(char *sample, const int size, ActionType& type, std::string& value)
   return result;
 }
 
-class RemoteDescriptionEvent : public nsIRunnable {
+static const int BufferSize = 2048;
+
+class OfferEvent : public WebRTCCallEvent {
 public:
-  NS_DECL_THREADSAFE_ISUPPORTS
+  OfferEvent(WebRTCCall& aCall, const std::string& aOffer)
+      : mCall(aCall)
+      , mOffer(aOffer) {}
 
-  std::string mDescription;
-  int mAction;
-
-  RemoteDescriptionEvent(mozilla::RefPtr<sipcc::PeerConnectionImpl>& aPc) :
-                         mAction(OfferAction),
-                         mPc(aPc) {}
-
-  NS_IMETHOD Run() {
-    mPc->SetRemoteDescription(mAction, mDescription.c_str());
-    if (mAction == OfferAction) {
-      LOG("dispatch thread %p\n", (void *)pthread_self());
-      sipcc::MediaConstraintsExternal c;
-      mPc->CreateAnswer(c);
-    }
-    return NS_OK;
-  }
-
-  virtual ~RemoteDescriptionEvent() {}
+  virtual void Run() { mCall.SetOffer(mOffer); }
 protected:
-  mozilla::RefPtr<sipcc::PeerConnectionImpl> mPc;
+  WebRTCCall& mCall;
+  std::string mOffer;
 };
 
-NS_IMPL_ISUPPORTS1(RemoteDescriptionEvent, nsIRunnable);
+void*
+ReadStdin(void* ptr)
+{
+  WebRTCCall* self = static_cast<WebRTCCall*>(ptr);
 
-class nsReadStdin : public nsIRunnable {
+  static char buf[BufferSize];
+  bool done = false;
+  while (!done) {
+    mozilla::unused << fgets(buf, BufferSize, stdin);
+    ActionType type = UnknownAction;
+    std::string description;
+    parse(buf, BufferSize, type, description);
+
+    if (type == OfferAction) {
+      self->AddEvent(new OfferEvent(*self, description));
+    }
+    else if (!strncmp(buf, "EXIT", 4)) { done = true; LOG("EXIT THREAD!"); }
+    else { REPLY("{\"type\":\"error\",\"message\":\"Unknown payload\"}"); }
+  }
+  return nullptr;
+}
+
+class TestWebRTCCallObserver : public WebRTCCallObserver {
 public:
-  NS_DECL_THREADSAFE_ISUPPORTS
-
-  nsReadStdin(nsCOMPtr<nsIThread>& aTarget,
-              mozilla::RefPtr<sipcc::PeerConnectionImpl>& aPc) :
-              mTarget(aTarget),
-              mPc(aPc) {}
-
-  NS_IMETHOD Run() {
-
-    nsCOMPtr<nsIThread> thread;
-    nsresult rv = NS_GetCurrentThread(getter_AddRefs(thread));
-    if (NS_FAILED(rv)) {
-      LOG("failed to get current thread\n");
-      return NS_OK;
-    }
-    LOG("running on read stdin thread %p %p\n", (void *)pthread_self(), (void *)thread.get());
-
-    nsCOMPtr<RemoteDescriptionEvent> event = new RemoteDescriptionEvent(mPc);
-
-    static char buf[BufferSize];
-    bool done = false;
-    while (!done) {
-      fgets(buf, BufferSize, stdin);
-      ActionType type = UnknownAction;
-      parse(buf, BufferSize, type, event->mDescription);
-      LOG("-=-=-=-START-=-=-=-\n");
-      LOG("%s\n", event->mDescription.c_str());
-      LOG("-=-=-=-STOP -=-=-=-\n");
-
-      if (type != UnknownAction) {
-        event->mAction = type;
-        mTarget->Dispatch(event, nsIEventTarget::DISPATCH_NORMAL);
-      }
-      else {
-        if (!strncmp(buf, "EXIT", 4)) { done = true; LOG("EXIT THREAD!"); }
-        REPLY("{\"type\":\"error\",\"message\":\"Unknown payload\"}");
-      }
-    }
-    return NS_OK;
+  TestWebRTCCallObserver() : mFile(nullptr)
+  {
+    //play with "mplayer -demuxer rawvideo -rawvideo w=640:h=480:format=i420 video.yuv"
+    mFile = fopen("video.yuv", "w");
+  }
+  virtual ~TestWebRTCCallObserver()
+  {
+    if (mFile) { fclose(mFile); }
   }
 
-  virtual ~nsReadStdin() {}
+  void ReceiveAnswer(const std::string& aAnswer)
+  {
+    std::string out("{\"type\":\"answer\",\"sdp\":\"");
+    const char* ptr = aAnswer.c_str();
+    while (*ptr) {
+      if (*ptr == '\n') { out += "\\n"; }
+      else if (*ptr == '\r') { out += "\\r"; }
+      else { out += *ptr; }
+      ptr++;
+    }
+    out += "\"}";
+    REPLY("%s", out.c_str());
+  }
+
+  void ReceiveNextVideoFrame(const unsigned char* aBuffer, const int32_t aBufferSize)
+  {
+    if (mFile && aBuffer && aBufferSize) { fwrite(aBuffer, aBufferSize, 1, mFile); }
+  }
 protected:
-  nsCOMPtr<nsIThread> mTarget;
-  mozilla::RefPtr<sipcc::PeerConnectionImpl> mPc;
+  FILE* mFile;
 };
 
-NS_IMPL_ISUPPORTS1(nsReadStdin, nsIRunnable)
+class TestWebRTCCallSystem : public WebRTCCallSystem {
+public:
+  TestWebRTCCallSystem(sem_t* aSema) : mSema(aSema) {}
+  virtual ~TestWebRTCCallSystem() {}
+  void NotifyNextEventReady() { if (mSema) { sem_post(mSema); } }
+protected:
+  sem_t* mSema;
+};
 
+} // namespace
 
 int
-main(int argc, char *argv[]) {
+main(int argc, char *argv[])
+{
+  std::string name("/testapp-semaphore-");
+  std::stringstream out;
+  out << getpid();
+  name += out.str();
+  LOG("Semaphore name: %s\n", name.c_str());
+  sem_t* sema = sem_open(name.c_str(), O_CREAT, S_IRUSR | S_IWUSR, 0);
 
-  NS_InitXPCOM2(nullptr, nullptr, nullptr);
-  NSS_NoDB_Init(nullptr);
-  NSS_SetDomesticPolicy();
-  nsresult rv;
+  TestWebRTCCallSystem system(sema);
+  TestWebRTCCallObserver obs;
+  WebRTCCall call(system, obs);
 
-  nsCOMPtr<nsITimer> timer = do_CreateInstance(NS_TIMER_CONTRACTID, &rv);
-  if (NS_FAILED(rv)) {
-    LOG("failed to create timer\n");
-    return 0;
+  pthread_t t;
+  pthread_create(&t, nullptr, ReadStdin, static_cast<void*>(&call));
+
+  while(true) {
+    if (sem_wait(sema) < 0) {
+       switch (errno) {
+         case EAGAIN:  LOG("The semaphore is already locked.\n"); break;
+         case EDEADLK: LOG("A deadlock was detected.\n"); break;
+         case EINTR:   LOG("The call was interrupted by a signal.\n"); break;
+         case EINVAL:  LOG("sem is not a valid semaphore descriptor.\n"); break;
+         default: LOG("UNKNOWN Error\n");
+       }
+    }
+    call.ProcessNextEvent();
   }
 
-  sipcc::IceConfiguration cfg;
-
-  nsCOMPtr<nsIThread> thread;
-  rv = NS_GetCurrentThread(getter_AddRefs(thread));
-  if (NS_FAILED(rv)) {
-    LOG("failed to get current thread\n");
-    return 0;
-  }
-  LOG("running on thread %p\n", (void *)thread.get());
-  LOG("main thread %p\n", (void *)pthread_self());
-
-  mozilla::RefPtr<sipcc::PeerConnectionImpl> pc = sipcc::PeerConnectionImpl::CreatePeerConnection();
-  nsRefPtr<PCObserver> pco = new PCObserver(pc.get());
-  pc->Initialize(*pco, nullptr, cfg, thread.get());
-
-  nsCOMPtr<nsIRunnable> event = new nsReadStdin(thread, pc);
-
-  nsCOMPtr<nsIThread> runner;
-
-  rv = NS_NewThread(getter_AddRefs(runner), event);
-  if (NS_FAILED(rv)) {
-    LOG("failed to create thread\n");
-    return 0;
-  }
-
-  timer->InitWithCallback(pco, PR_MillisecondsToInterval(30),
-                               nsITimer::TYPE_REPEATING_PRECISE);
-
-  //XRE_RunAppShell();
-  // while (NS_ProcessNextEvent(nullptr, false)) { LOG("ProcessNextEvent\n"); }
-  while (true) { NS_ProcessNextEvent(nullptr, true); } // LOG("ProcessNextEvent\n"); }
-
+  sem_close(sema);
+  sem_unlink(name.c_str());
+  sema = nullptr;
   return 0;
 }
