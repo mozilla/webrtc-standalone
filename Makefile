@@ -19,7 +19,8 @@ $(GECKO_OBJ)/media/libspeex_resampler/src/libmedia_libspeex_resampler_src.a.desc
 $(GECKO_OBJ)/netwerk/srtp/src/libnksrtp_s.a.desc \
 $(GECKO_OBJ)/media/mtransport/standalone/libmtransport_s.a.desc \
 $(GECKO_OBJ)/media/webrtc/signalingtest/signaling_ecc/libecc.a.desc \
-$(GECKO_OBJ)/media/webrtc/signalingtest/signaling_sipcc/libsipcc.a.desc
+$(GECKO_OBJ)/media/webrtc/signalingtest/signaling_sipcc/libsipcc.a.desc \
+$(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 

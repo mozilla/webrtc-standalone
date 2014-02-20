@@ -6,7 +6,7 @@ if [ "$TESTAPP_PATH" = "" ] ; then
   export TESTAPP_DIR=..
 fi
 if [ "$GECKO_DIST_BIN" = "" ] ; then
-  GECKO_DIST_BIN=$GECKO_BIN_DIR/dist/bin
+  GECKO_DIST_BIN=$GECKO_BIN_DIR/dist/lib
 fi
 DEBUG=0
 if [ "$1" = "-d" ] ; then
