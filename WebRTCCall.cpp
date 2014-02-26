@@ -20,6 +20,7 @@
 #include "nss.h"
 #include "nsISupportsImpl.h"
 #include "nsITimer.h"
+#include "nsThreadUtils.h"
 #include "nsWeakReference.h"
 #include "nsXPCOM.h"
 #include "PeerConnectionImpl.h"

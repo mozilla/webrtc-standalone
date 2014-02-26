@@ -6,6 +6,7 @@ include .geckopaths
 PLATFORM=$(shell uname)
 include platforms/common.mk
 include platforms/$(PLATFORM).mk
+#include xul.mk
 
 BUILD_DIR=./build
 
@@ -17,15 +18,19 @@ $(GECKO_OBJ)/media/libvpx/libmedia_libvpx.a.desc \
 $(GECKO_OBJ)/media/libjpeg/libmedia_libjpeg.a.desc \
 $(GECKO_OBJ)/media/libspeex_resampler/src/libmedia_libspeex_resampler_src.a.desc \
 $(GECKO_OBJ)/netwerk/srtp/src/libnksrtp_s.a.desc \
-$(GECKO_OBJ)/media/mtransport/standalone/libmtransport_s.a.desc \
+$(GECKO_OBJ)/media/mtransport/build/libmtransport.a.desc \
 $(GECKO_OBJ)/media/webrtc/signalingtest/signaling_ecc/libecc.a.desc \
 $(GECKO_OBJ)/media/webrtc/signalingtest/signaling_sipcc/libsipcc.a.desc \
-$(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
+$(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc \
+$(GECKO_OBJ)/xpcom/static/libsignalingsupport.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
-testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP)
-	$(CXX) $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP) $(LFLAGS) -o $@
+#testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP)
+#	$(CXX) $(BUILD_DIR)/testapp.o $(STATICOBJ) $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP) $(LFLAGS) -o $@
+
+testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o
+	$(CXX) $(BUILD_DIR)/testapp.o $(STATICOBJ) $(BUILD_DIR)/WebRTCCall.o `python ./tools/expand.py $(LIBS)` $(LFLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
