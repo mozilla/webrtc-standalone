@@ -12,8 +12,6 @@
 #include <sys/stat.h>        // For mode constants
 #include <unistd.h>
 
-#include "mozilla/unused.h"
-
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
 #define REPLY(format, ...) \
   fprintf(stdout, format, ##__VA_ARGS__); \
@@ -81,7 +79,7 @@ ReadStdin(void* ptr)
   static char buf[BufferSize];
   bool done = false;
   while (!done) {
-    mozilla::unused << fgets(buf, BufferSize, stdin);
+    fgets(buf, BufferSize, stdin);
     ActionType type = UnknownAction;
     std::string description;
     parse(buf, BufferSize, type, description);
@@ -118,6 +116,7 @@ public:
       ptr++;
     }
     out += "\"}";
+LOG("REPLY: %s\n", out.c_str());
     REPLY("%s", out.c_str());
   }
 
@@ -167,7 +166,7 @@ main(int argc, char *argv[])
          default: LOG("UNKNOWN Error\n");
        }
     }
-    call.ProcessNextEvent();
+    else { call.ProcessNextEvent(); }
   }
 
   sem_close(sema);

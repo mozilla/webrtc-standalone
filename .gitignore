@@ -1,5 +1,8 @@
 .geckopaths
 testapp
-testapp.o
+external
 build
 .DS_Store
+*.swp
+*.o
+*.yuv

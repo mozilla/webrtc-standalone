@@ -13,7 +13,6 @@ CFLAGS = \
 -DUSE_FAKE_PCOBSERVER \
 -fPIC \
 -Qunused-arguments \
--include $(GECKO_OBJ)/mozilla-config.h \
 -MD \
 -MP \
 -Wall \
@@ -78,15 +77,9 @@ LFLAGS = \
 -framework ExceptionHandling \
 -Wl,-executable_path,$(GECKO_OBJ)/dist/bin \
 -Wl,-dead_strip \
-$(GECKO_OBJ)/dist/sdk/lib/XUL \
 -lcrmf \
 -lnss3 \
--lunicharutil_external_s \
--lxpcomglue_s \
 -lnspr4 \
--lplc4 \
--lplds4 \
--lsmime3 \
 -lssl3 \
 -lnssutil3 \
 -framework AudioToolbox \
@@ -109,6 +102,5 @@ $(GECKO_OBJ)/dist/sdk/lib/XUL \
 -framework AudioUnit \
 -framework AddressBook \
 -framework OpenGL \
--lmozglue \
 -lmozalloc
 

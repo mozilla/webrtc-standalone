@@ -1,7 +1,8 @@
 INCLUDE = \
+-I$(GECKO_ROOT)/media/include/common \
+-I$(GECKO_ROOT)/media/include/external \
 -I$(GECKO_ROOT)/media/webrtc/signaling/test \
 -I$(GECKO_ROOT)/media/webrtc/trunk/testing/gtest/include \
--I$(GECKO_ROOT)/ipc/chromium/src \
 -I$(GECKO_ROOT)/media/mtransport \
 -I$(GECKO_ROOT)/media/mtransport/test \
 -I$(GECKO_ROOT)/media/webrtc/signaling/include \
@@ -27,15 +28,9 @@ INCLUDE = \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/stats \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/plugin \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/event \
--I$(GECKO_ROOT)/xpcom/base/ \
--I$(GECKO_OBJ)/dom/bindings/ \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/port/darwin/include \
--I$(GECKO_ROOT)/ipc/chromium/src \
--I$(GECKO_ROOT)/ipc/glue \
--I$(GECKO_OBJ)/ipc/ipdl/_ipdlheaders \
 -I$(GECKO_ROOT)/media/webrtc/trunk/webrtc \
--I$(GECKO_OBJ)/dist/include \
 -I$(GECKO_OBJ)/dist/include/nspr \
--I$(GECKO_OBJ)/dist/include/nss \
--I$(GECKO_OBJ)/dist/include/testing
+-I$(GECKO_OBJ)/dist/include \
+-I$(GECKO_OBJ)/dist/include/nss
 

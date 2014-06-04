@@ -1,6 +1,6 @@
 #!/bin/sh
 if [ "$GECKO_BIN_DIR" = "" ] ; then
-  GECKO_BIN_DIR=/Volumes/fennec/gecko-desktop/obj-x86_64-apple-darwin12.5.0
+  GECKO_BIN_DIR=/Volumes/fennec/gecko-desktop/obj-x86_64-apple-darwin12.5.0-debug
 fi
 if [ "$TESTAPP_PATH" = "" ] ; then
   export TESTAPP_DIR=..
