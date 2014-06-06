@@ -55,6 +55,7 @@ public:
   virtual nsresult Notify(Timer *timer)
   {
     printf("%s: %p\n", msg, PR_GetCurrentThread());
+    timer->Release();
     return NS_OK;
   }
 };
@@ -102,6 +103,8 @@ main(int argc, char *argv[])
   timer->InitWithCallback(quit, 1000, Timer::TYPE_REPEATING_PRECISE);
   mozilla::RefPtr<Timer> oneShot = CreateTimer();
   oneShot->InitWithCallback(new Tick("One Shot"), 0, Timer::TYPE_ONE_SHOT);
+  oneShot->AddRef();
+  oneShot = nullptr;
 
   while(!quit->Done()) {
     media::ProcessNextEvent(true);
