@@ -7,6 +7,8 @@
 #include "stdio.h"
 #include "prthread.h"
 
+#include "prinrval.h"
+
 using namespace media;
 
 class Lookup : public DNSListener {
@@ -54,8 +56,12 @@ public:
   const char* msg;
   virtual nsresult Notify(Timer *timer)
   {
-    printf("%s: %p\n", msg, PR_GetCurrentThread());
-    timer->Release();
+static PRUint32 then = PR_IntervalNow();
+PRUint32 now = PR_IntervalNow();
+fprintf(stderr, "GOT: %u msec\n", (unsigned int)PR_IntervalToMilliseconds(now - then));
+then = now;
+//    printf("%s: %p\n", msg, PR_GetCurrentThread());
+//    timer->Release();
     return NS_OK;
   }
 };
@@ -92,27 +98,29 @@ main(int argc, char *argv[])
 
   printf("Main Thread: %p\n", PR_GetCurrentThread());
 
-  mozilla::RefPtr<DNS> dns = GetDNSService();
-  mozilla::RefPtr<Lookup> lookup = new Lookup;
-  dns->AsyncResolve("mozilla.org", DNS::RESOLVE_DISABLE_IPV6, lookup, nullptr, nullptr);
+//  mozilla::RefPtr<DNS> dns = GetDNSService();
+// mozilla::RefPtr<Lookup> lookup = new Lookup;
+// dns->AsyncResolve("mozilla.org", DNS::RESOLVE_DISABLE_IPV6, lookup, nullptr, nullptr);
 
-  mozilla::RefPtr<Thread> thread = NS_NewThread(new ThreadTest());
+// mozilla::RefPtr<Thread> thread = NS_NewThread(new ThreadTest());
 
-  mozilla::RefPtr<TickQuit> quit = new TickQuit;
+//  mozilla::RefPtr<TickQuit> quit = new TickQuit;
+//  mozilla::RefPtr<Timer> timer = CreateTimer();
+//  timer->InitWithCallback(quit, 1000, Timer::TYPE_REPEATING_PRECISE);
   mozilla::RefPtr<Timer> timer = CreateTimer();
-  timer->InitWithCallback(quit, 1000, Timer::TYPE_REPEATING_PRECISE);
-  mozilla::RefPtr<Timer> oneShot = CreateTimer();
-  oneShot->InitWithCallback(new Tick("One Shot"), 0, Timer::TYPE_ONE_SHOT);
-  oneShot->AddRef();
-  oneShot = nullptr;
+  timer->InitWithCallback(new Tick("One Shot"), 16, Timer::TYPE_REPEATING_PRECISE);
 
-  while(!quit->Done()) {
+static PRUint32 then = PR_IntervalNow();
+  while(true) { // !quit->Done()) {
     media::ProcessNextEvent(true);
-    printf("Process Event\n");
+PRUint32 now = PR_IntervalNow();
+fprintf(stderr, "ProcessNextEvent: %u msec\n", (unsigned int)PR_IntervalToMilliseconds(now - then));
+then = now;
+//    printf("Process Event\n");
   }
 
   timer = nullptr;
-  oneShot = nullptr;
+//  oneShot = nullptr;
 
   media::Shutdown();
 

@@ -24,7 +24,10 @@ $(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
-all: external testapp
+all: player external testapp
+
+player: $(BUILD_DIR)/player.o $(LIB_ROLLUP)
+	$(CXX) $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(LFLAGS) -o $@
 
 external: $(BUILD_DIR)/external.o $(LIB_ROLLUP)
 	$(CXX) $(BUILD_DIR)/external.o $(LIB_ROLLUP) $(LFLAGS) -o $@
@@ -41,9 +44,10 @@ $(LIB_ROLLUP): $(LIBS)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/testapp.o $(BUILD_DIR)/external.o $(BUILD_DIR)/WebRTCCall.o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/testapp.o $(BUILD_DIR)/external.o $(BUILD_DIR)/WebRTCCall.o
 
 clobber: clean
+	rm -f player
 	rm -f external
 	rm -f testapp
 	rm -rf $(BUILD_DIR)
