@@ -1,6 +1,7 @@
 .geckopaths
 testapp
 external
+player
 build
 .DS_Store
 *.swp
