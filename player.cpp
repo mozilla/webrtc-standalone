@@ -56,7 +56,7 @@ public:
   VideoSink(const mozilla::RefPtr<State>& aState) : mState(aState) {}
   virtual ~VideoSink() {}
 
-  virtual void SegmentReady( media::MediaSegment* aSegment)
+  virtual void SegmentReady(media::MediaSegment* aSegment)
   {
     media::VideoSegment* segment = reinterpret_cast<media::VideoSegment*>(aSegment);
     if (segment && mState) {
@@ -64,8 +64,9 @@ public:
       unsigned int size;
       const unsigned char *image = frame->GetImage(&size);
       if (size > 0) {
-LOG("Got IMAGE!\n");
-        render::Draw(image, size, 640, 480);
+        int width = 0, height = 0;
+        frame->GetWidthAndHeight(&width, &height);
+        render::Draw(image, size, width, height);
       }
     }
   }
@@ -255,14 +256,9 @@ main(int argc, char* argv[])
   opt.value.reuse_addr = true;
   PR_SetSocketOption(sock, &opt);
 
-//  opt.option = PR_SockOpt_Blocking;
-//  opt.value.non_blocking = true;
-//  PR_SetSocketOption(sock, &opt);
-
   CheckPRError(PR_Bind(sock, &addr));
 
   if (CheckPRError(PR_Listen(sock, 5))) {
-//    memset(&addr, 0, sizeof(addr));
     state->mSock = PR_Accept(sock, &addr, PR_INTERVAL_NO_TIMEOUT);
     PR_Shutdown(sock, PR_SHUTDOWN_BOTH);
     PR_Close(sock);
@@ -300,7 +296,7 @@ main(int argc, char* argv[])
 
   timer->InitWithCallback(
     state->mPeerConnectionObserver,
-    PR_MillisecondsToInterval(30),
+    PR_MillisecondsToInterval(16),
     media::Timer::TYPE_REPEATING_PRECISE);
 
   state->mPeerConnection->SetRemoteDescription(PCOFFER, offer);

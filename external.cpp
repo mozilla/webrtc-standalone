@@ -6,6 +6,7 @@
 #include "mozilla/RefPtr.h"
 #include "stdio.h"
 #include "prthread.h"
+#include <unistd.h>
 
 #include "prinrval.h"
 
@@ -123,6 +124,8 @@ then = now;
 //  oneShot = nullptr;
 
   media::Shutdown();
+
+  sleep(2);
 
   return 0;
 }

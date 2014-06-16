@@ -1,3 +1,5 @@
+RENDERNAME=renderSDL2
+
 CFLAGS = \
 -DDEBUG -D_DEBUG -DTRACING \
 -DOS_POSIX=1 \
@@ -101,3 +103,7 @@ LFLAGS = \
 -lmozalloc \
 -ldl
 
+#$(GECKO_OBJ)/memory/mozalloc/Unified_cpp_memory_mozalloc0.o \
+
+CFLAGS+=-I/home/randall/SDL2/include/SDL2 -D_THREAD_SAFE
+LFLAGS+=-L/home/randall/SDL2/lib -lSDL2
