@@ -26,8 +26,8 @@ LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
 all: player external testapp
 
-player: $(BUILD_DIR)/player.o $(LIB_ROLLUP)
-	$(CXX) $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(LFLAGS) -o $@
+player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/$(RENDERNAME).o
+	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
 
 external: $(BUILD_DIR)/external.o $(LIB_ROLLUP)
 	$(CXX) $(BUILD_DIR)/external.o $(LIB_ROLLUP) $(LFLAGS) -o $@
@@ -37,14 +37,14 @@ testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP)
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
-	$(CXX) $(CFLAGS) $(INCLUDE) $^ -c -o $@
+	$(CXX) $(CFLAGS) $(SDL_CFLAGS) $(INCLUDE) $^ -c -o $@
 
 $(LIB_ROLLUP): $(LIBS)
 	@mkdir -p $(BUILD_DIR)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/testapp.o $(BUILD_DIR)/external.o $(BUILD_DIR)/WebRTCCall.o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/testapp.o $(BUILD_DIR)/external.o $(BUILD_DIR)/WebRTCCall.o $(BUILD_DIR)/$(RENDERNAME).o
 
 clobber: clean
 	rm -f player

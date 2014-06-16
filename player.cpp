@@ -9,24 +9,33 @@
 #include <sys/stat.h>        // For mode constants
 #include <unistd.h>
 
+#include "mozilla/RefPtr.h"
 #include "FakeMediaStreams.h"
+
 #include "MediaExternal.h"
 #include "MediaMutex.h"
+#include "MediaRefCount.h"
 #include "MediaRunnable.h"
+#include "MediaSegmentExternal.h"
 #include "MediaThread.h"
 #include "MediaTimer.h"
-#include "MediaSegmentExternal.h"
-#include "nss.h"
-#include "PeerConnectionImpl.h"
+
 #include "PeerConnectionCtx.h"
+#include "PeerConnectionImpl.h"
+
+#include "nss.h"
 #include "ssl.h"
+
 #include "prthread.h"
 #include "prerror.h"
 #include "prio.h"
 
+#include "render.h"
+
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
 
 namespace {
+
 class PCObserver;
 typedef media::MutexAutoLock MutexAutoLock;
 
@@ -56,7 +65,7 @@ public:
       const unsigned char *image = frame->GetImage(&size);
       if (size > 0) {
 LOG("Got IMAGE!\n");
-          //mState->AddEvent(new ReceiveNextVideoFrameEvent(mState, image, size));
+        render::Draw(image, size, 640, 480);
       }
     }
   }
@@ -298,8 +307,10 @@ main(int argc, char* argv[])
   sipcc::MediaConstraintsExternal constraints;
   state->mPeerConnection->CreateAnswer(constraints);
 
-  while (true) { NS_ProcessNextEvent(nullptr, true); }
+  render::Initialize();
+  while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); }
 
+  render::Shutdown();
   media::Shutdown();
 
   return 0;
