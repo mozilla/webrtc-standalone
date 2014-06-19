@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 namespace render {
 
 struct State {
@@ -25,6 +27,7 @@ Shutdown()
 void
 Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
 {
+  fprintf(stderr, "Got image: %d %dx%d\n", size, aWidth, aHeight);
 }
 
 bool

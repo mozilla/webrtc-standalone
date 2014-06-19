@@ -134,17 +134,12 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
   }
 
   nsresult rv;
-  mozilla::dom::PCImplReadyState gotready;
   mozilla::dom::PCImplIceConnectionState gotice;
   mozilla::dom::PCImplIceGatheringState goticegathering;
   mozilla::dom::PCImplSipccState gotsipcc;
   mozilla::dom::PCImplSignalingState gotsignaling;
 
   switch (state_type) {
-  case mozilla::dom::PCObserverStateType::ReadyState:
-    rv = mState->mPeerConnection->ReadyState(&gotready);
-    MEDIA_ENSURE_SUCCESS(rv, rv);
-    break;
   case mozilla::dom::PCObserverStateType::IceConnectionState:
     rv = mState->mPeerConnection->IceConnectionState(&gotice);
     MEDIA_ENSURE_SUCCESS(rv, rv);

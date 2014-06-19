@@ -18,7 +18,7 @@ $(GECKO_OBJ)/layout/media/webrtc/libwebrtc.a.desc \
 $(GECKO_OBJ)/media/libopus/libmedia_libopus.a.desc \
 $(GECKO_OBJ)/media/libvpx/libmedia_libvpx.a.desc \
 $(GECKO_OBJ)/media/libjpeg/libmedia_libjpeg.a.desc \
-$(GECKO_OBJ)/media/libspeex_resampler/src/libmedia_libspeex_resampler_src.a.desc \
+$(GECKO_OBJ)/media/libspeex_resampler/src/libspeex.a.desc \
 $(GECKO_OBJ)/netwerk/srtp/src/libnksrtp_s.a.desc \
 $(GECKO_OBJ)/media/mtransport/standalone/libmtransport_s.a.desc \
 $(GECKO_OBJ)/media/webrtc/signalingtest/signaling_ecc/libecc.a.desc \
