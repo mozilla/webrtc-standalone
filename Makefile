@@ -3,11 +3,11 @@
 #GECKO_OBJ = $(GECKO_ROOT)/obj-x86_64-apple-darwin12.5.0
 
 include .geckopaths
-PLATFORM=$(shell uname)
+PLATFORM:=$(shell uname)
 include platforms/common.mk
 include platforms/$(PLATFORM).mk
 
-BUILD_DIR=./build
+BUILD_DIR=./build-$(PLATFORM)
 
 LIBS = \
 $(GECKO_OBJ)/mfbt/libmfbt.a.desc \
@@ -24,16 +24,10 @@ $(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
-all: player external testapp
+all: player
 
 player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/$(RENDERNAME).o
 	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
-
-external: $(BUILD_DIR)/external.o $(LIB_ROLLUP)
-	$(CXX) $(BUILD_DIR)/external.o $(LIB_ROLLUP) $(LFLAGS) -o $@
-
-testapp: $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP)
-	$(CXX) $(BUILD_DIR)/testapp.o $(BUILD_DIR)/WebRTCCall.o $(LIB_ROLLUP) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
@@ -44,10 +38,8 @@ $(LIB_ROLLUP): $(LIBS)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/testapp.o $(BUILD_DIR)/external.o $(BUILD_DIR)/WebRTCCall.o $(BUILD_DIR)/$(RENDERNAME).o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o
 
 clobber: clean
 	rm -f player
-	rm -f external
-	rm -f testapp
 	rm -rf $(BUILD_DIR)

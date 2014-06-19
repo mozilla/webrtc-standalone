@@ -2,7 +2,7 @@
 testapp
 external
 player
-build
+build*
 .DS_Store
 *.swp
 *.o
