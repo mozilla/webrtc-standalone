@@ -113,7 +113,7 @@ PCObserver::OnCreateAnswerSuccess(const char* answer, ER&)
 {
   if (answer && mState.get() && mState->mSock && mState->mPeerConnection.get()) {
     mState->mPeerConnection->SetLocalDescription(PCANSWER, answer);
-    std::string out(answer);
+fprintf(stderr, "Answer ->\n%s\n", answer);
     PR_Send(mState->mSock, answer, strlen(answer), 0, PR_INTERVAL_NO_TIMEOUT);
   }
 
