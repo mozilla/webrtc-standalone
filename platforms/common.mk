@@ -1,6 +1,5 @@
 INCLUDE = \
--I$(GECKO_ROOT)/media/include/common \
--I$(GECKO_ROOT)/media/include/external \
+-I$(GECKO_ROOT)/media/standalone/include \
 -I$(GECKO_ROOT)/media/webrtc/signaling/test \
 -I$(GECKO_ROOT)/media/webrtc/trunk/testing/gtest/include \
 -I$(GECKO_ROOT)/media/mtransport \
