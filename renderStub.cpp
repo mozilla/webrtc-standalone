@@ -21,6 +21,7 @@ Initialize()
   }
   fprintf(stderr, "render::Initialize\n");
   sState = new State;
+  //play with "mplayer -demuxer rawvideo -rawvideo w=640:h=480:format=i420 video.yuv"
   sState->Out = fopen("video.yuv", "w");
 }
 
@@ -42,7 +43,6 @@ bool
 KeepRunning()
 {
   bool result = true;
-  fprintf(stderr,"KeepRunning\n");
 
   return result;
 }
