@@ -2,6 +2,9 @@
 
 #include "SDL.h"
 
+#include <stdio.h>
+#define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
+
 static void
 quit(int rc)
 {
@@ -39,7 +42,8 @@ Initialize()
   sState->window = SDL_CreateWindow("WebRTC Player",
                                     SDL_WINDOWPOS_UNDEFINED,
                                     SDL_WINDOWPOS_UNDEFINED,
-                                    640, 480,
+                                    //640, 480,
+                                    320, 240,
                                     0);
                                     // SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
   if (!sState->window) {
@@ -53,11 +57,12 @@ Initialize()
     quit(4);
   }
 
-  sState->texture = SDL_CreateTexture(sState->renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, 640, 480);
+  sState->texture = SDL_CreateTexture(sState->renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, 320, 240);
   if (!sState->texture) {
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't set create texture: %s\n", SDL_GetError());
     quit(5);
   }
+LOG("Initialized\n");
 }
 
 void
@@ -84,6 +89,7 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
   }
 
   dst = (Uint8*)pixels;
+fprintf(stderr, "Got Image: %d %d x %d\n",(int)size, (int)aWidth,(int)aHeight);
   memcpy(dst, aImage, size);
   SDL_UnlockTexture(sState->texture);
 
@@ -98,6 +104,7 @@ KeepRunning()
   bool result = true;
   SDL_Event event;
   while (SDL_PollEvent(&event)) {
+LOG("SDL_PollEvent\n");
     switch (event.type) {
       case SDL_KEYDOWN:
         if (event.key.keysym.sym == SDLK_ESCAPE) {
@@ -109,6 +116,7 @@ KeepRunning()
       break;
     }
   }
+LOG("SDL_PollEvent DONE\n");
   return result;
 }
 
