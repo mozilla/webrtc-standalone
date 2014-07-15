@@ -302,6 +302,7 @@ main(int argc, char* argv[])
   while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); LOG("Processed Event!\n"); }
 
   if (state->mStream) { state->mStream->GetStream()->AsSourceStream()->StopStream(); }
+  state->mPeerConnection->CloseStreams();
   state->mPeerConnection->Close();
   state->mPeerConnection = nullptr;
 
