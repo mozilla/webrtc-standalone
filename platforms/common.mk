@@ -3,7 +3,6 @@ INCLUDE = \
 -I$(GECKO_ROOT)/media/webrtc/signaling/test \
 -I$(GECKO_ROOT)/media/webrtc/trunk/testing/gtest/include \
 -I$(GECKO_ROOT)/media/mtransport \
--I$(GECKO_ROOT)/media/mtransport/test \
 -I$(GECKO_ROOT)/media/webrtc/signaling/include \
 -I$(GECKO_ROOT)/media/webrtc/signaling/src/sipcc/core/sdp \
 -I$(GECKO_ROOT)/media/webrtc/signaling/src/sipcc/cpr/include \
