@@ -299,7 +299,7 @@ main(int argc, char* argv[])
   state->mPeerConnection->CreateAnswer(constraints);
 
   render::Initialize();
-  while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); LOG("Processed Event!\n"); }
+  while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); }
 
   if (state->mStream) { state->mStream->GetStream()->AsSourceStream()->StopStream(); }
   state->mPeerConnection->CloseStreams();
