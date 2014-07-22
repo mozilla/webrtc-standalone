@@ -33,13 +33,6 @@ Initialize()
   }
 
   sState = new State;
-
-  SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
-
-  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
-    return;
-  }
 }
 
 void
@@ -58,6 +51,13 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
   }
 
   if (!sState->window) {
+    SDL_LogSetPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_INFO);
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+      SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s\n", SDL_GetError());
+      return;
+    }
+
     sState->window = SDL_CreateWindow("WebRTC Player",
                                       SDL_WINDOWPOS_UNDEFINED,
                                       SDL_WINDOWPOS_UNDEFINED,
@@ -123,17 +123,19 @@ bool
 KeepRunning()
 {
   bool result = true;
-  SDL_Event event;
-  while (SDL_PollEvent(&event)) {
-    switch (event.type) {
-      case SDL_KEYDOWN:
-        if (event.key.keysym.sym == SDLK_ESCAPE) {
+  if (sState->window) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      switch (event.type) {
+        case SDL_KEYDOWN:
+          if (event.key.keysym.sym == SDLK_ESCAPE) {
+            result = false;
+          }
+        break;
+        case SDL_QUIT:
           result = false;
-        }
-      break;
-      case SDL_QUIT:
-        result = false;
-      break;
+        break;
+      }
     }
   }
   return result;

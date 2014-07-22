@@ -101,6 +101,11 @@ LFLAGS = \
 -lnssutil \
 -lplds4 \
 -rdynamic \
+-lXext \
+-lXcomposite \
+-lXdamage \
+-lXfixes \
+-lX11 \
 -lmozalloc \
 -ldl
 
