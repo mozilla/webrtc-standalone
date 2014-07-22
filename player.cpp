@@ -295,8 +295,7 @@ main(int argc, char* argv[])
     media::Timer::TYPE_REPEATING_PRECISE);
 
   state->mPeerConnection->SetRemoteDescription(PCOFFER, offer);
-  sipcc::MediaConstraintsExternal constraints;
-  state->mPeerConnection->CreateAnswer(constraints);
+  state->mPeerConnection->CreateAnswer();
 
   render::Initialize();
   while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); }

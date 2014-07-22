@@ -62,8 +62,11 @@ LFLAGS = \
 -lmozalloc
 
 #CFLAGS+=-I/Users/rbarker/usr/include/SDL2 -D_THREAD_SAFE
-LFLAGS+=-L/Users/rbarker/usr/lib \
--lm \
+#LFLAGS+=-L/Users/rbarker/usr/lib \
+#-lSDL2 \
+#-lSDL2main
+
+LFLAGS+=-lm \
 -liconv \
 -framework OpenGL \
 -framework ForceFeedback \

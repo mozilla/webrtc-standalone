@@ -21,8 +21,6 @@ Initialize()
   }
   fprintf(stderr, "render::Initialize\n");
   sState = new State;
-  //play with "mplayer -demuxer rawvideo -rawvideo w=640:h=480:format=i420 video.yuv"
-  sState->Out = fopen("video.yuv", "w");
 }
 
 void
@@ -35,6 +33,8 @@ Shutdown()
 void
 Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
 {
+  //play with "mplayer -demuxer rawvideo -rawvideo w=640:h=480:format=i420 video.yuv"
+  if (!sState->Out) { sState->Out = fopen("video.yuv", "w"); }
   fprintf(stderr, "Got image: %d %dx%d\n", size, aWidth, aHeight);
   if (sState && sState->Out && aImage && size) { fwrite(aImage, size, 1, sState->Out); }
 }
