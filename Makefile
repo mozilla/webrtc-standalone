@@ -28,10 +28,13 @@ $(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
-all: player
+all: player glplayer
 
 player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/$(RENDERNAME).o
 	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+
+glplayer: $(BUILD_DIR)/glplayer.o
+	$(CXX) $(BUILD_DIR)/glplayer.o $(SDL_LFLAGS) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
@@ -42,8 +45,9 @@ $(LIB_ROLLUP): $(LIBS)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o
+	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/glplayer.o $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o
 
 clobber: clean
 	rm -f player
+	rm -f glplayer
 	rm -rf $(BUILD_DIR)

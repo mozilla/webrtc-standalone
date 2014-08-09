@@ -1,4 +1,4 @@
-RENDERNAME=renderStub
+RENDERNAME=renderSDL2
 
 CFLAGS = \
 -fvisibility=hidden \
@@ -39,7 +39,6 @@ CFLAGS = \
 -std=gnu++0x \
 -pipe \
 -g \
--O3 \
 -fomit-frame-pointer
 
 LFLAGS = \
@@ -61,10 +60,10 @@ LFLAGS = \
 -framework SystemConfiguration \
 -lmozalloc
 
-#CFLAGS+=-I/Users/rbarker/usr/include/SDL2 -D_THREAD_SAFE
-#LFLAGS+=-L/Users/rbarker/usr/lib \
-#-lSDL2 \
-#-lSDL2main
+CFLAGS+=-I/Users/rbarker/usr/include/SDL2 -D_THREAD_SAFE
+LFLAGS+=-L/Users/rbarker/usr/lib \
+-lSDL2 \
+-lSDL2main
 
 LFLAGS+=-lm \
 -liconv \
