@@ -60,7 +60,7 @@ LFLAGS = \
 -framework SystemConfiguration \
 -lmozalloc
 
-CFLAGS+=-I$(SDL_INCLUDE_PATH) -D_THREAD_SAFE
+CFLAGS+=-I$(SDL_INCLUDE_PATH) -D_THREAD_SAFE -DDARWIN_GL
 LFLAGS+=-L$(SDL_LIB_PATH) \
 -lSDL2 \
 -lSDL2main
