@@ -1,4 +1,4 @@
-RENDERNAME=renderSDL2
+RENDERNAME=renderGL
 
 CFLAGS = \
 -fvisibility=hidden \

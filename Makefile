@@ -30,11 +30,14 @@ LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
 all: player glplayer
 
-player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/$(RENDERNAME).o
-	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderSDL2.o
+	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderSDL2.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
 
-glplayer: $(BUILD_DIR)/glplayer.o
-	$(CXX) $(BUILD_DIR)/glplayer.o $(SDL_LFLAGS) $(LFLAGS) -o $@
+glplayer: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderGL.o
+	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderGL.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+
+stubplayer: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderStub.o
+	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderStub.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
