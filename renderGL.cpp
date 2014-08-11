@@ -1,23 +1,22 @@
 #include <stdio.h>
 #include <stdlib.h>
-/* If using gl3.h */
-/* Ensure we are using opengl's core profile only */
-#define GL3_PROTOTYPES 1
-#include <OpenGL/gl3.h>
+#define GL_GLEXT_PROTOTYPES
+#include <GL/gl.h>
+#include <GL/glext.h>
 
 #include <SDL.h>
 #define PROGRAM_NAME "WebRTC GL Player"
 
 namespace render {
 static const GLchar* vertexSource =
-    "#version 120\n"
-    "attribute vec2 position;"
-    "attribute vec2 texcoord;"
-    "varying vec2 varTexcoord;"
-    "void main() {"
-    "   gl_Position = vec4(position, 0.0, 1.0);"
-    "   varTexcoord = texcoord;"
-    "}";
+  "#version 120\n"
+  "attribute vec2 position;"
+  "attribute vec2 texcoord;"
+  "varying vec2 varTexcoord;"
+  "void main() {"
+  "   gl_Position = vec4(position, 0.0, 1.0);"
+  "   varTexcoord = texcoord;"
+  "}";
 
 static const GLchar *fragmentSource =
   "varying vec2 varTexcoord;\n"
@@ -29,11 +28,9 @@ static const GLchar *fragmentSource =
   "  y=texture2D(texY, varTexcoord).r;\n"
   "  u=texture2D(texU, varTexcoord).r;\n"
   "  v=texture2D(texV, varTexcoord).r;\n"
-
   "  y=1.1643*(y-0.0625);\n"
   "  u=u-0.5;\n"
   "  v=v-0.5;\n"
-
   "  r=y+1.5958*v;\n"
   "  g=y-0.39173*u-0.81290*v;\n"
   "  b=y+2.017*u;\n"
@@ -192,15 +189,15 @@ fprintf(stderr, "Got %d x %d size: %d\n", aWidth, aHeight, size);
 
     const unsigned char* chanY = aImage;
     glBindTexture(GL_TEXTURE_2D, textureY);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth, aHeight, 0, GL_RED, GL_UNSIGNED_BYTE, chanY);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_INTENSITY, aWidth, aHeight, 0, GL_INTENSITY, GL_UNSIGNED_BYTE, chanY);
 
     const unsigned char* chanU = aImage + (aWidth * aHeight);
     glBindTexture(GL_TEXTURE_2D, textureU);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanU);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_INTENSITY, aWidth / 2, aHeight / 2, 0, GL_INTENSITY, GL_UNSIGNED_BYTE, chanU);
 
     const unsigned char* chanV = aImage + (aWidth * aHeight) + (aWidth * aHeight / 4);
     glBindTexture(GL_TEXTURE_2D, textureV);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanV);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_INTENSITY, aWidth / 2, aHeight / 2, 0, GL_INTENSITY, GL_UNSIGNED_BYTE, chanV);
 
     glClearColor ( 0.0, 0.0, 0.0, 1.0 );
     glClear ( GL_COLOR_BUFFER_BIT );

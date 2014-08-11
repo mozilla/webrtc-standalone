@@ -112,4 +112,4 @@ LFLAGS = \
 #$(GECKO_OBJ)/memory/mozalloc/Unified_cpp_memory_mozalloc0.o \
 
 CFLAGS+=-I$(SDL_INCLUDE_PATH) -D_THREAD_SAFE
-LFLAGS+=-L$(SDL_LIB_PATH) -lSDL2
+LFLAGS+=-L$(SDL_LIB_PATH) -lSDL2 -lGL
