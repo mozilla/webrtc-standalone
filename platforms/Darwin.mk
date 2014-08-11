@@ -60,8 +60,8 @@ LFLAGS = \
 -framework SystemConfiguration \
 -lmozalloc
 
-CFLAGS+=-I/Users/rbarker/usr/include/SDL2 -D_THREAD_SAFE
-LFLAGS+=-L/Users/rbarker/usr/lib \
+CFLAGS+=-I$(SDL_INCLUDE_PATH) -D_THREAD_SAFE
+LFLAGS+=-L$(SDL_LIB_PATH) \
 -lSDL2 \
 -lSDL2main
 
