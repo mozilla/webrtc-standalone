@@ -74,7 +74,7 @@ protected:
   mozilla::RefPtr<State> mState;
 };
 
-class PCObserver : public PeerConnectionObserverExternal, public media::TimerCallback
+class PCObserver : public PeerConnectionObserverExternal
 {
 MEDIA_REF_COUNT_INLINE
 public:
@@ -101,9 +101,17 @@ public:
   NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&) { return NS_OK; }
   NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&) { return NS_OK; }
 
+protected:
+  mozilla::RefPtr<State> mState;
+};
+
+class PullTimer : public media::TimerCallback
+{
+MEDIA_REF_COUNT_INLINE
+public:
+  PullTimer(const mozilla::RefPtr<State>& aState) : mState(aState) {}
   // media::TimerCallback
   NS_IMETHOD Notify(media::Timer *timer);
-
 protected:
   mozilla::RefPtr<State> mState;
 };
@@ -193,7 +201,7 @@ PCObserver::OnRemoveStream(ER&)
 }
 
 NS_IMETHODIMP
-PCObserver::Notify(media::Timer *timer)
+PullTimer::Notify(media::Timer *timer)
 {
   if (mState.get()) {
     Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mState->mStream.get());
@@ -288,9 +296,10 @@ main(int argc, char* argv[])
   state->mPeerConnection->Initialize(*(state->mPeerConnectionObserver), nullptr, cfg, NS_GetCurrentThread());
 
   mozilla::RefPtr<media::Timer> timer = media::CreateTimer();;
+  mozilla::RefPtr<PullTimer> pull = new PullTimer(state);
 
   timer->InitWithCallback(
-    state->mPeerConnectionObserver,
+    pull,
     PR_MillisecondsToInterval(16),
     media::Timer::TYPE_REPEATING_PRECISE);
 
