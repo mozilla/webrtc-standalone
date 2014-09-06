@@ -246,7 +246,7 @@ main(int argc, char* argv[])
 
   PRNetAddr addr;
   memset(&addr, 0, sizeof(addr));
-  PR_SetNetAddr(PR_IpAddrAny, PR_AF_INET, 8088, &addr);
+  PR_SetNetAddr(PR_IpAddrAny, PR_AF_INET, 8011, &addr);
   PRFileDesc* sock = PR_OpenTCPSocket(PR_AF_INET);
 
   if (!sock) {

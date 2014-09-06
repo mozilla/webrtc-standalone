@@ -50,6 +50,8 @@ static GLuint textureV;
 static GLuint vertexShader;
 static GLuint fragmentShader;
 static GLuint shaderProgram;
+static int sWidth = 640;
+static int sHeight = 480;
 
 static GLfloat vertices[] = {
     -1.0f, -1.0f,
@@ -95,7 +97,7 @@ Initialize()
 
   mainwindow = SDL_CreateWindow(PROGRAM_NAME,
                                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                640, 480,
+                                sWidth, sHeight,
                                 SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN);
   if (!mainwindow) {
     sdldie("Unable to create window");
@@ -185,12 +187,37 @@ Initialize()
   glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 0, texcoord);
 }
 
+const int MaxWidth = 800;
+const int MaxHeight = 600;
+
 void
 Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
 {
   if (mainwindow) {
 
-fprintf(stderr, "Got %d x %d size: %d\n", aWidth, aHeight, size);
+    int tWidth = aWidth;
+    int tHeight = aHeight;
+
+    if ((tWidth > MaxWidth) || (aHeight > MaxHeight)) {
+      if ((float(tWidth) / float(MaxWidth)) > (float(tHeight) / float(MaxHeight))) {
+        tHeight = int((float(MaxWidth) / float(tWidth)) * float(tHeight));
+        tWidth = MaxWidth;
+      }
+      else {
+        tWidth = int((float(MaxHeight) / float(tHeight)) * float(tWidth));
+        tHeight = MaxHeight;
+      }
+    }
+
+    if ((tWidth != sWidth) || (tHeight != sHeight)) {
+
+      SDL_SetWindowSize(mainwindow, tWidth, tHeight);
+      glViewport(0, 0, tWidth, tHeight);
+      sWidth = tWidth;
+      sHeight = tHeight;
+    }
+
+fprintf(stderr, "Got %d x %d size: %d using: %d x %d\n", aWidth, aHeight, size, tWidth, tHeight);
 
     const unsigned char* chanY = aImage;
     glBindTexture(GL_TEXTURE_2D, textureY);
@@ -200,7 +227,7 @@ fprintf(stderr, "Got %d x %d size: %d\n", aWidth, aHeight, size);
     glBindTexture(GL_TEXTURE_2D, textureU);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanU);
 
-    const unsigned char* chanV = aImage + (aWidth * aHeight) + (aWidth * aHeight / 4);
+    const unsigned char* chanV = aImage + (aWidth * aHeight) + (aWidth * aHeight / 4); //  + (aWidth / 4);
     glBindTexture(GL_TEXTURE_2D, textureV);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanV);
 

@@ -49,6 +49,7 @@ LFLAGS = \
 -lobjc \
 -framework ExceptionHandling \
 -Wl,-executable_path,$(GECKO_OBJ)/dist/bin \
+-Wl,-rpath,$(GECKO_OBJ)/dist/bin \
 -lcrmf \
 -lnss3 \
 -lnspr4 \
