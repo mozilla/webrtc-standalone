@@ -128,7 +128,7 @@ class ECPRestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 reply = """HTTP/1.1 200 OK
 Cache-Control: max-age=300
 ST: roku:ecp
-Location: http://10.0.1.6:8060/
+Location: http://""" + socket.gethostbyname(socket.gethostname()) + """:8060/
 USN: uuid:roku:ecp:P0A070000007
 
 """
@@ -144,18 +144,17 @@ def ssdpWorker():
   insock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
   insock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   insock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-  insock.bind(('', MCAST_PORT))
+  insock.bind((MCAST_GRP, MCAST_PORT))
   mreq = struct.pack("4sl", socket.inet_aton(MCAST_GRP), socket.INADDR_ANY)
   insock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
   outsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
   outsock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-  #outsock.sendto("robot", (MCAST_GRP, MCAST_PORT))
 
   while True:
     packet = insock.recv(10240)
-    print "recv->"
-    print packet
+#    print "recv->"
+#    print packet
     values = packet.split('\r\n')
     if len(values) > 2 and values[0].find('M-SEARCH') == 0:
       for line in values[1:]:
