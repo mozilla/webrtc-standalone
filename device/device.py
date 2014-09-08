@@ -125,10 +125,15 @@ class ECPRestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     '.h': 'text/plain',
     })
 
+tempSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+tempSocket.connect(("gmail.com",80))
+hostIP = tempSocket.getsockname()[0];
+tempSocket.close()
+
 reply = """HTTP/1.1 200 OK
 Cache-Control: max-age=300
 ST: roku:ecp
-Location: http://""" + socket.gethostbyname(socket.gethostname()) + """:8060/
+Location: http://""" + hostIP + """:8060/
 USN: uuid:roku:ecp:P0A070000007
 
 """
@@ -153,8 +158,8 @@ def ssdpWorker():
 
   while True:
     packet = insock.recv(10240)
-#    print "recv->"
-#    print packet
+    print "recv->"
+    print packet
     values = packet.split('\r\n')
     if len(values) > 2 and values[0].find('M-SEARCH') == 0:
       for line in values[1:]:
