@@ -142,7 +142,7 @@ HOST_NAME = ''
 PORT_NUMBER=8060
 
 def ssdpWorker():
-  print "Worker thread"
+  print "Starting SSDP thread"
   MCAST_GRP = "239.255.255.250"
   MCAST_PORT = 1900
 
@@ -158,16 +158,17 @@ def ssdpWorker():
 
   while True:
     packet = insock.recv(10240)
-    print "recv->"
-    print packet
+#    print "recv->"
+#    print packet
     values = packet.split('\r\n')
     if len(values) > 2 and values[0].find('M-SEARCH') == 0:
       for line in values[1:]:
         if line == 'ST: roku:ecp':
-          print "send->"
-          print reply
+#          print "send->"
+#          print reply
           outsock.sendto(reply, (MCAST_GRP, MCAST_PORT))
 
+print "Starting Simulator"
 t = threading.Thread(target=ssdpWorker)
 t.setDaemon(True)
 t.start()
@@ -175,7 +176,6 @@ t.start()
 server_class = BaseHTTPServer.HTTPServer
 httpd = server_class((HOST_NAME, PORT_NUMBER), ECPRestHandler)
 
-print "Starting Simulator"
 
 try:
   while True:

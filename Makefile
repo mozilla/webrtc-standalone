@@ -28,16 +28,25 @@ $(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
 
+JSON = $(BUILD_DIR)/libyajl.a
+
 all: player glplayer
 
-player: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderSDL2.o
-	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderSDL2.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+$(JSON):
+	cd 3rdparty/yajl; make
 
-glplayer: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderGL.o
-	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderGL.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+OBJS = \
+$(BUILD_DIR)/player.o \
+$(BUILD_DIR)/json.o
 
-stubplayer: $(BUILD_DIR)/player.o $(LIB_ROLLUP) $(BUILD_DIR)/renderStub.o
-	$(CXX) $(BUILD_DIR)/player.o $(BUILD_DIR)/renderStub.o $(LIB_ROLLUP) $(SDL_LFLAGS) $(LFLAGS) -o $@
+player: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderSDL2.o $(JSON)
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderSDL2.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
+
+glplayer: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderGL.o $(JSON)
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderGL.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
+
+stubplayer: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderStub.o $(JSON)
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderStub.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
@@ -48,7 +57,7 @@ $(LIB_ROLLUP): $(LIBS)
 	$(AR) cr $@ `python ./tools/expand.py $(LIBS)`
 
 clean:
-	rm -f $(LIB_ROLLUP) $(BUILD_DIR)/glplayer.o $(BUILD_DIR)/player.o $(BUILD_DIR)/$(RENDERNAME).o
+	rm -f $(LIB_ROLLUP) $(JSON) $(BUILD_DIR)/*.o
 
 clobber: clean
 	rm -f player

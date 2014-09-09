@@ -30,6 +30,7 @@
 #include "prerror.h"
 #include "prio.h"
 
+#include "json.h"
 #include "render.h"
 
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
@@ -97,9 +98,13 @@ public:
   NS_IMETHODIMP OnRemoveStream(ER&);
   NS_IMETHODIMP OnAddTrack(ER&) { return NS_OK; }
   NS_IMETHODIMP OnRemoveTrack(ER&) { return NS_OK; }
-  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&) { return NS_OK; }
-  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&) { return NS_OK; }
-  NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&) {
+LOG("\n\n **** OnAddIceCandidateSuccess\n\n");
+return NS_OK; }
+  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&) {
+LOG("\n\n **** OnAddIceCandidateError: %u %s\n\n", code, msg);
+return NS_OK; }
+  NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&);
 
 protected:
   mozilla::RefPtr<State> mState;
@@ -197,6 +202,21 @@ NS_IMETHODIMP
 PCObserver::OnRemoveStream(ER&)
 {
   // Not being called?
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+PCObserver::OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&) {
+  LOG("\n\n **** OnIceCandidate %d %s %s\n\n", (int)level, mid, cand);
+  JSONGenerator gen;
+  gen.addPair(std::string("candidate"), std::string(cand));
+  gen.addPair(std::string("mid"), std::string(mid));
+  gen.addPair(std::string("level"), (int)level);
+  std::string value;
+  if (gen.getJSON(value)) {
+    LOG("Sending candidate: %s\n", value.c_str());
+    PR_Send(mState->mSock, value.c_str(), value.length(), 0, PR_INTERVAL_NO_TIMEOUT);
+  }
   return NS_OK;
 }
 
@@ -303,7 +323,18 @@ main(int argc, char* argv[])
     PR_MillisecondsToInterval(16),
     media::Timer::TYPE_REPEATING_PRECISE);
 
-  state->mPeerConnection->SetRemoteDescription(PCOFFER, offer);
+  JSONParser parse(offer);
+  std::string sdp;
+
+  if (!parse.find(std::string("sdp"), sdp)) {
+    LOG("Failed to parse offer JSON.\n");
+    exit(1);
+  }
+  else {
+    LOG("offer->\n%s\n", sdp.c_str());
+  }
+
+  state->mPeerConnection->SetRemoteDescription(PCOFFER, sdp.c_str());
   state->mPeerConnection->CreateAnswer();
 
   render::Initialize();

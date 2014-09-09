@@ -30,5 +30,6 @@ INCLUDE = \
 -I$(GECKO_ROOT)/media/webrtc/trunk/webrtc \
 -I$(GECKO_OBJ)/dist/include/nspr \
 -I$(GECKO_OBJ)/dist/include \
--I$(GECKO_OBJ)/dist/include/nss
+-I$(GECKO_OBJ)/dist/include/nss \
+-I./3rdparty/yajl
 
