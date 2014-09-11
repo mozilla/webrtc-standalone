@@ -1,11 +1,11 @@
-# These should be defined in .geckopaths
+# These should be defined in .config
 #GECKO_ROOT = /Volumes/fennec/gecko-desktop
 #GECKO_OBJ = $(GECKO_ROOT)/obj-x86_64-apple-darwin12.5.0
 #For Linux:
 #SDL_INCLUDE_PATH = path/to/sdl/header/files
 #SDL_LIB_PATH = path/to/sdl/libs
 
-include .geckopaths
+include .config
 PLATFORM:=$(shell uname)
 include platforms/common.mk
 include platforms/$(PLATFORM).mk

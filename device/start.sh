@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PATH_FILE=../.geckopaths
+PATH_FILE=../.config
 
 if [ ! -f $PATH_FILE ] ; then
   echo $PATH_FILE not found!

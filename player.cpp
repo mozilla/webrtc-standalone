@@ -228,22 +228,39 @@ SocketHandler::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
       }
     }
     else {
+      mCondition = NS_BASE_STREAM_CLOSED;
       static bool failed = false;
       if (!failed) {
-        LOG("Socket failed to read data\n");
+        LOG("No data on socket ready. Assuming connection lost.\n");
         failed = true;
       }
     }
   }
-  else {
-    LOG("Unknown outFlags: %d\n", (int)outFlags);
+  if (outFlags & PR_POLL_WRITE) {
+     LOG("\n*** PR_POLL_WRITE\n");
+  }
+  if (outFlags & PR_POLL_EXCEPT) {
+     LOG("\n*** PR_POLL_EXCEPT\n");
+  }
+  if (outFlags & PR_POLL_ERR) {
+     LOG("\n*** PR_POLL_ERR\n");
+  }
+  if (outFlags & PR_POLL_NVAL) {
+     LOG("\n*** PR_POLL_NVAL\n");
+  }
+  if (outFlags & PR_POLL_HUP) {
+     LOG("\n*** PR_POLL_HUP\n");
   }
 }
 
 void
 SocketHandler::OnSocketDetached(PRFileDesc *fd)
 {
-
+  LOG("Socket Detached!\n");
+  if (fd == mState->mSocket) {
+    PR_Close(fd);
+    mState->mSocket = 0;
+  }
 }
 
 NS_IMETHODIMP
