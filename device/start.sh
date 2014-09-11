@@ -13,6 +13,7 @@ eval `tr -d '()' < $PATH_FILE`
 # Setup for both Linux and Mac to run player
 export LD_LIBRARY_PATH=$GECKO_OBJ/dist/lib
 export DYLD_LIBRARY_PATH=$GECKO_OBJ/dist/lib
+export NSPR_LOG_MODULES=all:5
 
 # Start simulator
 python simulator.py

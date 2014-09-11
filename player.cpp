@@ -12,11 +12,13 @@
 #include "mozilla/RefPtr.h"
 #include "FakeMediaStreams.h"
 
+#include "MediaASocketHandler.h"
 #include "MediaExternal.h"
 #include "MediaMutex.h"
 #include "MediaRefCount.h"
 #include "MediaRunnable.h"
 #include "MediaSegmentExternal.h"
+#include "MediaSocketTransportService.h"
 #include "MediaThread.h"
 #include "MediaTimer.h"
 
@@ -35,7 +37,26 @@
 
 #define LOG(format, ...) fprintf(stderr, format, ##__VA_ARGS__);
 
+const char JSONTerminator[] = "\r\n";
+const int JSONTerminatorSize = sizeof(JSONTerminator) - 1;
+
 namespace {
+
+void
+LogPRError()
+{
+  PRInt32 len = PR_GetErrorTextLength() + 1;
+  if (len > 0) {
+    char* buf = new char[len];
+    memset(buf, 0, len);
+    PR_GetErrorText(buf);
+    LOG("PR Error: %s\n", buf);
+    delete []buf;
+  }
+  else {
+    LOG("PR Error number: %d\n", (int)PR_GetError());
+  }
+}
 
 class PCObserver;
 typedef media::MutexAutoLock MutexAutoLock;
@@ -44,8 +65,8 @@ struct State {
   mozilla::RefPtr<nsIDOMMediaStream> mStream;
   mozilla::RefPtr<sipcc::PeerConnectionImpl> mPeerConnection;
   mozilla::RefPtr<PCObserver> mPeerConnectionObserver;
-  PRFileDesc* mSock;
-  State() : mSock(nullptr) {}
+  PRFileDesc* mSocket;
+  State() : mSocket(nullptr) {}
   MEDIA_REF_COUNT_INLINE
 };
 
@@ -75,6 +96,24 @@ protected:
   mozilla::RefPtr<State> mState;
 };
 
+static const int sBufferLength = 2048;
+
+class SocketHandler : public media::ASocketHandler {
+MEDIA_REF_COUNT_INLINE
+public:
+  SocketHandler(mozilla::RefPtr<State>& aState) : mState(aState) {
+    mPollFlags = PR_POLL_READ;
+  }
+  virtual void OnSocketReady(PRFileDesc *fd, int16_t outFlags);
+  virtual void OnSocketDetached(PRFileDesc *fd);
+
+protected:
+  char mBuffer[sBufferLength];
+  std::string mMessage;
+  mozilla::RefPtr<State> mState;
+};
+
+
 class PCObserver : public PeerConnectionObserverExternal
 {
 MEDIA_REF_COUNT_INLINE
@@ -98,12 +137,16 @@ public:
   NS_IMETHODIMP OnRemoveStream(ER&);
   NS_IMETHODIMP OnAddTrack(ER&) { return NS_OK; }
   NS_IMETHODIMP OnRemoveTrack(ER&) { return NS_OK; }
-  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&) {
-LOG("\n\n **** OnAddIceCandidateSuccess\n\n");
-return NS_OK; }
-  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&) {
-LOG("\n\n **** OnAddIceCandidateError: %u %s\n\n", code, msg);
-return NS_OK; }
+  NS_IMETHODIMP OnAddIceCandidateSuccess(ER&)
+  {
+    LOG("OnAddIceCandidateSuccessn\n");
+    return NS_OK;
+  }
+  NS_IMETHODIMP OnAddIceCandidateError(uint32_t code, const char *msg, ER&)
+  {
+    LOG("OnAddIceCandidateError: %u %s\n", code, msg);
+    return NS_OK;
+  }
   NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&);
 
 protected:
@@ -121,13 +164,104 @@ protected:
   mozilla::RefPtr<State> mState;
 };
 
+class ProcessMessage : public media::Runnable {
+public:
+  ProcessMessage(mozilla::RefPtr<State>& aState) :
+    mState(aState) {}
+  virtual nsresult Run();
+  void addMessage(const std::string& aMessage)
+  {
+    mMessageList.push_back(aMessage);
+  }
+protected:
+  mozilla::RefPtr<State> mState;
+  std::vector<std::string> mMessageList;
+};
+
+class DispatchSocketHandler : public media::Runnable {
+public:
+  DispatchSocketHandler(PRFileDesc* aSocket, mozilla::RefPtr<SocketHandler>& aHandler) :
+    mSocket(aSocket),
+    mHandler(aHandler) {}
+  virtual nsresult Run(void)
+  {
+    mozilla::RefPtr<media::SocketTransportService> sts = media::GetSocketTransportService();
+    sts->AttachSocket(mSocket, mHandler);
+    return NS_OK;
+  }
+protected:
+  PRFileDesc* mSocket;
+  mozilla::RefPtr<SocketHandler> mHandler;
+};
+
+void
+SocketHandler::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
+{
+  static const std::string Term(JSONTerminator);
+  if (outFlags & PR_POLL_READ) {
+    memset(mBuffer, 0, sBufferLength);
+    PRInt32 read = PR_Recv(fd, mBuffer, sBufferLength, 0, PR_INTERVAL_NO_WAIT);
+    if (read > 0) {
+      LOG("Received ->\n%s\n", mBuffer);
+      mozilla::RefPtr<ProcessMessage> pmsg = new ProcessMessage(mState);
+      mMessage += mBuffer;
+
+      size_t start = 0;
+      size_t found = mMessage.find(Term);
+      if (found != std::string::npos) {
+        while (found != std::string::npos) {
+          pmsg->addMessage(mMessage.substr(start, found - start));
+          start = found + JSONTerminatorSize;
+          found = mMessage.find(Term, start);
+        }
+        // Save any partial messages until the rest is received.
+        if (start < mMessage.length()) {
+          std::string remainder = mMessage.substr(start);
+          mMessage = remainder;
+          LOG("Saved: '%s'\n", mMessage.c_str());
+        }
+        else {
+          mMessage.clear();
+        }
+
+        NS_DispatchToMainThread(pmsg);
+      }
+    }
+    else {
+      static bool failed = false;
+      if (!failed) {
+        LOG("Socket failed to read data\n");
+        failed = true;
+      }
+    }
+  }
+  else {
+    LOG("Unknown outFlags: %d\n", (int)outFlags);
+  }
+}
+
+void
+SocketHandler::OnSocketDetached(PRFileDesc *fd)
+{
+
+}
+
 NS_IMETHODIMP
 PCObserver::OnCreateAnswerSuccess(const char* answer, ER&)
 {
-  if (answer && mState.get() && mState->mSock && mState->mPeerConnection.get()) {
+  if (answer && mState.get() && mState->mSocket && mState->mPeerConnection.get()) {
     mState->mPeerConnection->SetLocalDescription(PCANSWER, answer);
-fprintf(stderr, "Answer ->\n%s\n", answer);
-    PR_Send(mState->mSock, answer, strlen(answer), 0, PR_INTERVAL_NO_TIMEOUT);
+    LOG("Answer ->\n%s\n", answer);
+    JSONGenerator gen;
+    gen.openMap();
+    gen.addPair("type", std::string("answer"));
+    gen.addPair("sdp", std::string(answer));
+    gen.closeMap();
+    std::string value;
+    if (gen.getJSON(value)) {
+      PR_Send(mState->mSocket, value.c_str(), value.length(), 0, PR_INTERVAL_NO_TIMEOUT);
+      PR_Send(mState->mSocket, JSONTerminator, JSONTerminatorSize, 0, PR_INTERVAL_NO_TIMEOUT);
+    }
   }
 
   return NS_OK;
@@ -207,15 +341,29 @@ PCObserver::OnRemoveStream(ER&)
 
 NS_IMETHODIMP
 PCObserver::OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&) {
-  LOG("\n\n **** OnIceCandidate %d %s %s\n\n", (int)level, mid, cand);
-  JSONGenerator gen;
-  gen.addPair(std::string("candidate"), std::string(cand));
-  gen.addPair(std::string("mid"), std::string(mid));
-  gen.addPair(std::string("level"), (int)level);
-  std::string value;
-  if (gen.getJSON(value)) {
-    LOG("Sending candidate: %s\n", value.c_str());
-    PR_Send(mState->mSock, value.c_str(), value.length(), 0, PR_INTERVAL_NO_TIMEOUT);
+  if (cand && (cand[0] != '\0')) {
+    LOG("OnIceCandidate: candidate: %s mid: %s level: %d\n", cand, mid, (int)level);
+    JSONGenerator gen;
+    gen.openMap();
+    gen.addPair("candidate", std::string(cand));
+    gen.addPair("sdpMid", std::string(mid));
+    gen.addPair("sdpMLineIndex", (int)level - 1);
+    gen.closeMap();
+    std::string value;
+    if (gen.getJSON(value)) {
+      LOG("Sending candidate JSON: %s\n", value.c_str());
+      PRInt32 amount = PR_Send(mState->mSocket, value.c_str(), value.length(), 0, PR_INTERVAL_NO_TIMEOUT);
+      if (amount < (PRInt32)value.length()) {
+        LogPRError();
+      }
+      amount = PR_Send(mState->mSocket, JSONTerminator, JSONTerminatorSize, 0, PR_INTERVAL_NO_TIMEOUT);
+      if (amount < JSONTerminatorSize) {
+        LogPRError();
+      }
+    }
+  }
+  else {
+    LOG("OnIceCandidate ignoring null ice candidate\n");
   }
   return NS_OK;
 }
@@ -234,6 +382,51 @@ PullTimer::Notify(media::Timer *timer)
   return NS_OK;
 }
 
+typedef std::vector<std::string>::size_type vsize_t;
+
+nsresult
+ProcessMessage::Run()
+{
+  if (NS_IsMainThread() == false) {
+    LOG("ProcessMessage must be run on the main thread.\n");
+    return NS_ERROR_FAILURE;
+  }
+
+  const vsize_t size = mMessageList.size();
+  for (vsize_t ix = 0; ix < size; ix++) {
+    std::string message = mMessageList[ix];
+    JSONParser parse(message.c_str());
+    std::string type;
+    if (parse.find("type", type)) {
+      std::string sdp;
+      if ((type == "offer") && parse.find("sdp", sdp)) {
+        mState->mPeerConnection->SetRemoteDescription(PCOFFER, sdp.c_str());
+        mState->mPeerConnection->CreateAnswer();
+      }
+      else {
+        LOG("ERROR: Failed to parse offer:\n%s\n", message.c_str());
+      }
+    }
+    else {
+      std::string candidate, mid;
+      int index = 0;
+      if (parse.find("candidate", candidate) && parse.find("sdpMid", mid) && parse.find("sdpMLineIndex", index)) {
+        if (candidate[0] != '\0') {
+          mState->mPeerConnection->AddIceCandidate(candidate.c_str(), mid.c_str(), (unsigned short)index + 1);
+        }
+        else {
+          LOG("ERROR: Received NULL ice candidate:\n%s\n", message.c_str());
+        }
+      }
+      else {
+        LOG("ERROR: Ice candidate failed to parse: %s candidate:%s sdpMid:%s sdpMLineIndex:%s\n", message.c_str(), (parse.find("candidate", candidate) ? "True" : "False"), (parse.find("sdpMid", mid) ? "True" : "False"), (parse.find("sdpMLineIndex", index) ? "True" : "False"));
+      }
+    }
+  }
+
+  return NS_OK;
+}
+
 } // namespace
 
 bool
@@ -245,11 +438,11 @@ CheckPRError(PRStatus result)
       char* buf = new char[len];
       memset(buf, 0, len);
       PR_GetErrorText(buf);
-      fprintf(stderr, "Error: %s\n", buf);
+      LOG("PR Error: %s\n", buf);
       delete []buf;
     }
     else {
-      fprintf(stderr, "Error number: %d\n", (int)PR_GetError());
+      LOG("PR Error number: %d\n", (int)PR_GetError());
     }
     return false;
   }
@@ -270,7 +463,7 @@ main(int argc, char* argv[])
   PRFileDesc* sock = PR_OpenTCPSocket(PR_AF_INET);
 
   if (!sock) {
-    fprintf(stderr, "Failed to create socket\n.");
+    LOG("ERROR: Failed to create socket\n.");
   }
 
   PRSocketOptionData opt;
@@ -282,7 +475,7 @@ main(int argc, char* argv[])
   CheckPRError(PR_Bind(sock, &addr));
 
   if (CheckPRError(PR_Listen(sock, 5))) {
-    state->mSock = PR_Accept(sock, &addr, PR_INTERVAL_NO_TIMEOUT);
+    state->mSocket = PR_Accept(sock, &addr, PR_INTERVAL_NO_TIMEOUT);
     PR_Shutdown(sock, PR_SHUTDOWN_BOTH);
     PR_Close(sock);
     sock = nullptr;
@@ -291,24 +484,11 @@ main(int argc, char* argv[])
     exit(-1);
   }
 
-  const int len = 2048;
-  char offer[len];
-  memset(offer, 0, len);
-
-  if (state->mSock) {
-    PRInt32 read = PR_Recv(state->mSock, offer, len, 0, PR_INTERVAL_NO_TIMEOUT);
-    if (read > 0) {
-      fprintf(stderr, "Received ->\n%s\n", offer);
-    }
-    else {
-      fprintf(stderr, "Failed to read data\n");
-      exit(-1);
-    }
-  }
-  else {
-    LOG("Failed to get socket\n");
+  if (!state->mSocket) {
+    LOG("ERROR: Failed to create socket\n");
     exit(-1);
   }
+
   sipcc::IceConfiguration cfg;
 
   state->mPeerConnection = sipcc::PeerConnectionImpl::CreatePeerConnection();
@@ -323,19 +503,10 @@ main(int argc, char* argv[])
     PR_MillisecondsToInterval(16),
     media::Timer::TYPE_REPEATING_PRECISE);
 
-  JSONParser parse(offer);
-  std::string sdp;
-
-  if (!parse.find(std::string("sdp"), sdp)) {
-    LOG("Failed to parse offer JSON.\n");
-    exit(1);
-  }
-  else {
-    LOG("offer->\n%s\n", sdp.c_str());
-  }
-
-  state->mPeerConnection->SetRemoteDescription(PCOFFER, sdp.c_str());
-  state->mPeerConnection->CreateAnswer();
+  mozilla::RefPtr<SocketHandler> handler = new SocketHandler(state);
+  mozilla::RefPtr<DispatchSocketHandler> dispatch = new DispatchSocketHandler(state->mSocket, handler);
+  mozilla::RefPtr<media::EventTarget> sts = media::GetSocketTransportServiceTarget();
+  sts->Dispatch(dispatch, MEDIA_DISPATCH_NORMAL);
 
   render::Initialize();
   while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); }

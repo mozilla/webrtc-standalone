@@ -10,6 +10,7 @@ public:
 
   bool isValid(std::string& error);
   bool find(const std::string& key, std::string& value);
+  bool find(const std::string& key, int& value);
 
 protected:
   struct State;
@@ -21,8 +22,20 @@ public:
   JSONGenerator();
   ~JSONGenerator();
 
+  bool openMap();
+  bool closeMap();
   bool addPair(const std::string& key, const std::string& value);
+  bool addPair(const char* key, const std::string& value)
+  {
+    const std::string strKey(key);
+    return addPair(strKey, value);
+  }
   bool addPair(const std::string& key, const int value);
+  bool addPair(const char* key, const int value)
+  {
+    const std::string strKey(key);
+    return addPair(strKey, value);
+  }
   bool getJSON(std::string& key);
 
 protected:
