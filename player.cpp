@@ -95,12 +95,9 @@ public:
       if (size > 0) {
         int width = 0, height = 0;
         buf->GetWidthAndHeight(&width, &height);
-//LOG("Got frame: %dx%d %d\n", width, height, size);
         render::Draw(image, size, width, height);
       }
-//else { LOG("GOT EMPTY BUFFER\n"); }
     }
-//else { LOG("NO SEGMENT OR STATE\n"); }
   }
 protected:
   mozilla::RefPtr<State> mState;
@@ -225,7 +222,6 @@ nsresult
 DispatchSocketHandler::Run(void)
 {
   nsresult rv;
-  LOG("ATTACH SOCKET!!!");
   nsCOMPtr<nsISocketTransportService> sts = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
   sts->AttachSocket(mSocket, mHandler);
   return NS_OK;
