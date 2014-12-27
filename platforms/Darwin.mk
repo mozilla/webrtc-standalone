@@ -1,6 +1,90 @@
 RENDERNAME=renderGL
 
+
 CFLAGS = \
+-fvisibility=hidden \
+-DCHROMIUM_BUILD \
+-DUSE_LIBJPEG_TURBO='1' \
+-DENABLE_ONE_CLICK_SIGNIN \
+-DENABLE_REMOTING='1' \
+-DENABLE_WEBRTC='1' \
+-DENABLE_CONFIGURATION_POLICY \
+-DENABLE_INPUT_SPEECH \
+-DENABLE_NOTIFICATIONS \
+-DENABLE_HIDPI='1' \
+-DENABLE_GPU='1' \
+-DENABLE_EGLIMAGE='1' \
+-DUSE_SKIA='1' \
+-DENABLE_TASK_MANAGER='1' \
+-DENABLE_WEB_INTENTS='1' \
+-DENABLE_EXTENSIONS='1' \
+-DENABLE_PLUGIN_INSTALLATION='1' \
+-DENABLE_PROTECTOR_SERVICE='1' \
+-DENABLE_SESSION_SERVICE='1' \
+-DENABLE_THEMES='1' \
+-DENABLE_BACKGROUND='1' \
+-DENABLE_AUTOMATION='1' \
+-DENABLE_PRINTING='1' \
+-DENABLE_CAPTIVE_PORTAL_DETECTION='1' \
+-DLOG4CXX_STATIC \
+-D_NO_LOG4CXX \
+-DUSE_SSLEAY \
+-D_CPR_USE_EXTERNAL_LOGGER \
+-DWEBRTC_RELATIVE_PATH \
+-DHAVE_WEBRTC_VIDEO \
+-DHAVE_WEBRTC_VOICE \
+-DHAVE_STDINT_H='1' \
+-DHAVE_STDLIB_H='1' \
+-DHAVE_UINT8_T='1' \
+-DHAVE_UINT16_T='1' \
+-DHAVE_UINT32_T='1' \
+-DHAVE_UINT64_T='1' \
+-DMOZILLA_INTERNAL_API \
+-DMOZILLA_XPCOMRT_API \
+-DNO_CHROMIUM_LOGGING \
+-DUSE_FAKE_MEDIA_STREAMS \
+-DUSE_FAKE_PCOBSERVER \
+-DOS_MACOSX \
+-DSIP_OS_OSX \
+-DOSX \
+-D_FORTIFY_SOURCE='2' \
+-D__STDC_FORMAT_MACROS \
+-DDYNAMIC_ANNOTATIONS_ENABLED='1' \
+-DWTF_USE_DYNAMIC_ANNOTATIONS='1' \
+-DAB_CD=en-US \
+-DNO_NSPR_10_SUPPORT \
+-fPIC \
+-Qunused-arguments \
+-DMOZILLA_CLIENT \
+-MD \
+-MP \
+-Qunused-arguments \
+-Qunused-arguments \
+-Wall \
+-Wempty-body \
+-Woverloaded-virtual \
+-Wsign-compare \
+-Wwrite-strings \
+-Wno-invalid-offsetof \
+-Wno-c++0x-extensions \
+-Wno-extended-offsetof \
+-Wno-unknown-warning-option \
+-Wno-return-type-c-linkage \
+-fno-exceptions \
+-fno-strict-aliasing \
+-fno-rtti \
+-fno-exceptions \
+-fno-math-errno \
+-std=gnu++0x \
+-pthread \
+-DNO_X11 \
+-pipe \
+ -DDEBUG \
+-DTRACING \
+-g \
+-fno-omit-frame-pointer
+
+XXXXX_CFLAGS = \
 -fvisibility=hidden \
 -DOS_POSIX=1 \
 -DOS_MACOSX=1 \
@@ -13,7 +97,8 @@ CFLAGS = \
 -DTRIMMED \
 -DUSE_FAKE_MEDIA_STREAMS \
 -DUSE_FAKE_PCOBSERVER \
--DMOZILLA_MEDIA_STANDALONE \
+-DMOZILLA_INTERNAL_API \
+-DMOZILLA_XPCOMRT_API \
 -fPIC \
 -Qunused-arguments \
 -MD \
@@ -31,6 +116,7 @@ CFLAGS = \
 -Wno-unknown-warning-option \
 -Wno-return-type-c-linkage \
 -Wno-mismatched-tags \
+-Wno-inline-new-delete \
 -fno-exceptions \
 -fno-strict-aliasing \
 -fno-rtti \

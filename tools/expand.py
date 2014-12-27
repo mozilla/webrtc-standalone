@@ -1,6 +1,5 @@
 import sys
 
-
 def expand(file):
   with open(file) as f:
     for line in f:

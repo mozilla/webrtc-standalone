@@ -198,6 +198,7 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
     int tWidth = aWidth;
     int tHeight = aHeight;
 
+#if 0
     if ((tWidth > MaxWidth) || (aHeight > MaxHeight)) {
       if ((float(tWidth) / float(MaxWidth)) > (float(tHeight) / float(MaxHeight))) {
         tHeight = int((float(MaxWidth) / float(tWidth)) * float(tHeight));
@@ -208,6 +209,7 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
         tHeight = MaxHeight;
       }
     }
+#endif
 
     if ((tWidth != sWidth) || (tHeight != sHeight)) {
 
@@ -217,7 +219,7 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
       sHeight = tHeight;
     }
 
-fprintf(stderr, "Got %d x %d size: %d using: %d x %d\n", aWidth, aHeight, size, tWidth, tHeight);
+//fprintf(stderr, "Got %d x %d size: %d using: %d x %d\n", aWidth, aHeight, size, tWidth, tHeight);
 
     const unsigned char* chanY = aImage;
     glBindTexture(GL_TEXTURE_2D, textureY);

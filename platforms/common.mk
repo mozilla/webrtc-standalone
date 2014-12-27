@@ -1,4 +1,5 @@
 INCLUDE = \
+-I$(GECKO_ROOT)/dom/media \
 -I$(GECKO_ROOT)/media/standalone/include \
 -I$(GECKO_ROOT)/media/webrtc/signaling/test \
 -I$(GECKO_ROOT)/media/webrtc/trunk/testing/gtest/include \
@@ -28,8 +29,11 @@ INCLUDE = \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/event \
 -I$(GECKO_ROOT)/media/mtransport/third_party/nrappkit/src/port/darwin/include \
 -I$(GECKO_ROOT)/media/webrtc/trunk/webrtc \
+-I$(GECKO_ROOT)/media/webrtc \
+-I$(GECKO_ROOT)/xpcom/libxpcomrt \
 -I$(GECKO_OBJ)/dist/include/nspr \
 -I$(GECKO_OBJ)/dist/include \
+-I$(GECKO_OBJ)/dist/include/mozilla \
 -I$(GECKO_OBJ)/dist/include/nss \
 -I./3rdparty/yajl
 

@@ -11,26 +11,30 @@
 
 #include "mozilla/RefPtr.h"
 #include "FakeMediaStreams.h"
+#include "FakeMediaStreamsImpl.h"
+#include "FakePCObserver.h"
 
-#include "MediaASocketHandler.h"
-#include "MediaExternal.h"
-#include "MediaMutex.h"
-#include "MediaRefCount.h"
-#include "MediaRunnable.h"
-#include "MediaSegmentExternal.h"
-#include "MediaSocketTransportService.h"
-#include "MediaThread.h"
-#include "MediaTimer.h"
+#include "prio.h"
+#include "nsASocketHandler.h"
+#include "mozilla/Mutex.h"
+#include "nsRefPtr.h"
+#include "nsIRunnable.h"
+#include "VideoSegment.h"
+#include "nsISocketTransportService.h"
+#include "nsIThread.h"
+#include "nsITimer.h"
+#include "nsThreadUtils.h"
 
 #include "PeerConnectionCtx.h"
 #include "PeerConnectionImpl.h"
+
+#include "XPCOMRTInit.h"
 
 #include "nss.h"
 #include "ssl.h"
 
 #include "prthread.h"
 #include "prerror.h"
-#include "prio.h"
 
 #include "json.h"
 #include "render.h"
@@ -59,15 +63,17 @@ LogPRError()
 }
 
 class PCObserver;
-typedef media::MutexAutoLock MutexAutoLock;
+typedef mozilla::MutexAutoLock MutexAutoLock;
 
 struct State {
-  mozilla::RefPtr<nsIDOMMediaStream> mStream;
-  mozilla::RefPtr<sipcc::PeerConnectionImpl> mPeerConnection;
+  mozilla::RefPtr<mozilla::DOMMediaStream> mStream;
+  mozilla::RefPtr<mozilla::PeerConnectionImpl> mPeerConnection;
   mozilla::RefPtr<PCObserver> mPeerConnectionObserver;
   PRFileDesc* mSocket;
   State() : mSocket(nullptr) {}
-  MEDIA_REF_COUNT_INLINE
+  NS_INLINE_DECL_THREADSAFE_REFCOUNTING(State)
+protected:
+  ~State(){}
 };
 
 static const int32_t PCOFFER = 0;
@@ -78,19 +84,23 @@ public:
   VideoSink(const mozilla::RefPtr<State>& aState) : mState(aState) {}
   virtual ~VideoSink() {}
 
-  virtual void SegmentReady(media::MediaSegment* aSegment)
+  virtual void SegmentReady(mozilla::MediaSegment* aSegment)
   {
-    media::VideoSegment* segment = reinterpret_cast<media::VideoSegment*>(aSegment);
+    mozilla::VideoSegment* segment = reinterpret_cast<mozilla::VideoSegment*>(aSegment);
     if (segment && mState) {
-      const media::VideoFrame *frame = segment->GetLastFrame();
+      const mozilla::VideoFrame *frame = segment->GetLastFrame();
       unsigned int size;
-      const unsigned char *image = frame->GetImage(&size);
+      nsRefPtr<mozilla::SimpleImageBuffer> buf = frame->GetImage();
+      const unsigned char *image = buf->GetImage(&size);
       if (size > 0) {
         int width = 0, height = 0;
-        frame->GetWidthAndHeight(&width, &height);
+        buf->GetWidthAndHeight(&width, &height);
+//LOG("Got frame: %dx%d %d\n", width, height, size);
         render::Draw(image, size, width, height);
       }
+//else { LOG("GOT EMPTY BUFFER\n"); }
     }
+//else { LOG("NO SEGMENT OR STATE\n"); }
   }
 protected:
   mozilla::RefPtr<State> mState;
@@ -98,25 +108,32 @@ protected:
 
 static const int sBufferLength = 2048;
 
-class SocketHandler : public media::ASocketHandler {
-MEDIA_REF_COUNT_INLINE
+class SocketHandler : public nsASocketHandler {
+NS_DECL_THREADSAFE_ISUPPORTS
 public:
-  SocketHandler(mozilla::RefPtr<State>& aState) : mState(aState) {
+  SocketHandler(mozilla::RefPtr<State>& aState) : mState(aState), mSent(0), mReceived(0) {
     mPollFlags = PR_POLL_READ;
   }
   virtual void OnSocketReady(PRFileDesc *fd, int16_t outFlags);
   virtual void OnSocketDetached(PRFileDesc *fd);
+  virtual void IsLocal(bool *aIsLocal) { if (aIsLocal) { *aIsLocal = false; } }
+  virtual uint64_t ByteCountSent() { return mSent; }
+  virtual uint64_t ByteCountReceived() { return mReceived; }
 
 protected:
+  virtual ~SocketHandler() {}
   char mBuffer[sBufferLength];
   std::string mMessage;
   mozilla::RefPtr<State> mState;
+  uint64_t mSent;
+  uint64_t mReceived;
 };
 
+NS_IMPL_ISUPPORTS0(SocketHandler)
 
-class PCObserver : public PeerConnectionObserverExternal
+class PCObserver : public test::AFakePCObserver
 {
-MEDIA_REF_COUNT_INLINE
+NS_DECL_THREADSAFE_ISUPPORTS
 public:
   PCObserver(const mozilla::RefPtr<State>& aState) : mState(aState) {}
 
@@ -133,8 +150,10 @@ public:
   NS_IMETHODIMP NotifyClosedConnection(ER&) { return NS_OK; }
   NS_IMETHODIMP NotifyDataChannel(nsIDOMDataChannel *channel, ER&) { return NS_OK; }
   NS_IMETHODIMP OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, void*);
-  NS_IMETHODIMP OnAddStream(nsIDOMMediaStream *stream, ER&);
+  NS_IMETHODIMP OnAddStream(mozilla::DOMMediaStream *stream, ER&);
   NS_IMETHODIMP OnRemoveStream(ER&);
+  NS_IMETHODIMP OnReplaceTrackSuccess(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnReplaceTrackError(uint32_t code, const char *msg, ER&) { return NS_OK; }
   NS_IMETHODIMP OnAddTrack(ER&) { return NS_OK; }
   NS_IMETHODIMP OnRemoveTrack(ER&) { return NS_OK; }
   NS_IMETHODIMP OnAddIceCandidateSuccess(ER&)
@@ -150,49 +169,67 @@ public:
   NS_IMETHODIMP OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER&);
 
 protected:
+  virtual ~PCObserver() {}
   mozilla::RefPtr<State> mState;
 };
 
-class PullTimer : public media::TimerCallback
+NS_IMPL_ISUPPORTS(PCObserver, nsISupportsWeakReference)
+
+class PullTimer : public nsITimerCallback
 {
-MEDIA_REF_COUNT_INLINE
+NS_DECL_THREADSAFE_ISUPPORTS
 public:
   PullTimer(const mozilla::RefPtr<State>& aState) : mState(aState) {}
-  // media::TimerCallback
-  NS_IMETHOD Notify(media::Timer *timer);
+  NS_IMETHOD Notify(nsITimer *timer);
 protected:
+  virtual ~PullTimer() {}
   mozilla::RefPtr<State> mState;
 };
 
-class ProcessMessage : public media::Runnable {
+NS_IMPL_ISUPPORTS(PullTimer, nsITimerCallback)
+
+class ProcessMessage : public nsIRunnable {
+NS_DECL_THREADSAFE_ISUPPORTS
+NS_DECL_NSIRUNNABLE
 public:
   ProcessMessage(mozilla::RefPtr<State>& aState) :
     mState(aState) {}
-  virtual nsresult Run();
   void addMessage(const std::string& aMessage)
   {
     mMessageList.push_back(aMessage);
   }
 protected:
+  virtual ~ProcessMessage(){}
   mozilla::RefPtr<State> mState;
   std::vector<std::string> mMessageList;
 };
 
-class DispatchSocketHandler : public media::Runnable {
+NS_IMPL_ISUPPORTS(ProcessMessage, nsIRunnable)
+
+class DispatchSocketHandler : public nsIRunnable {
+NS_DECL_THREADSAFE_ISUPPORTS
+NS_DECL_NSIRUNNABLE
 public:
   DispatchSocketHandler(PRFileDesc* aSocket, mozilla::RefPtr<SocketHandler>& aHandler) :
     mSocket(aSocket),
     mHandler(aHandler) {}
-  virtual nsresult Run(void)
-  {
-    mozilla::RefPtr<media::SocketTransportService> sts = media::GetSocketTransportService();
-    sts->AttachSocket(mSocket, mHandler);
-    return NS_OK;
-  }
 protected:
+  virtual ~DispatchSocketHandler() {}
   PRFileDesc* mSocket;
   mozilla::RefPtr<SocketHandler> mHandler;
 };
+
+NS_IMPL_ISUPPORTS(DispatchSocketHandler, nsIRunnable)
+
+nsresult
+DispatchSocketHandler::Run(void)
+{
+  nsresult rv;
+  LOG("ATTACH SOCKET!!!");
+  nsCOMPtr<nsISocketTransportService> sts = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
+  sts->AttachSocket(mSocket, mHandler);
+  return NS_OK;
+}
 
 void
 SocketHandler::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
@@ -202,6 +239,7 @@ SocketHandler::OnSocketReady(PRFileDesc *fd, int16_t outFlags)
     memset(mBuffer, 0, sBufferLength);
     PRInt32 read = PR_Recv(fd, mBuffer, sBufferLength, 0, PR_INTERVAL_NO_WAIT);
     if (read > 0) {
+      mReceived += read;
       LOG("Received ->\n%s\n", mBuffer);
       mozilla::RefPtr<ProcessMessage> pmsg = new ProcessMessage(mState);
       mMessage += mBuffer;
@@ -300,28 +338,23 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
   nsresult rv;
   mozilla::dom::PCImplIceConnectionState gotice;
   mozilla::dom::PCImplIceGatheringState goticegathering;
-  mozilla::dom::PCImplSipccState gotsipcc;
   mozilla::dom::PCImplSignalingState gotsignaling;
 
   switch (state_type) {
   case mozilla::dom::PCObserverStateType::IceConnectionState:
     rv = mState->mPeerConnection->IceConnectionState(&gotice);
-    MEDIA_ENSURE_SUCCESS(rv, rv);
+    NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::IceGatheringState:
     rv = mState->mPeerConnection->IceGatheringState(&goticegathering);
-    MEDIA_ENSURE_SUCCESS(rv, rv);
+    NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SdpState:
-    // MEDIA_ENSURE_SUCCESS(rv, rv);
-    break;
-  case mozilla::dom::PCObserverStateType::SipccState:
-    rv = mState->mPeerConnection->SipccState(&gotsipcc);
-    MEDIA_ENSURE_SUCCESS(rv, rv);
+    // NS_ENSURE_SUCCESS(rv, rv);
     break;
   case mozilla::dom::PCObserverStateType::SignalingState:
     rv = mState->mPeerConnection->SignalingState(&gotsignaling);
-    MEDIA_ENSURE_SUCCESS(rv, rv);
+    NS_ENSURE_SUCCESS(rv, rv);
     break;
   default:
     // Unknown State
@@ -333,7 +366,7 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
 
 
 NS_IMETHODIMP
-PCObserver::OnAddStream(nsIDOMMediaStream *stream, ER&)
+PCObserver::OnAddStream(mozilla::DOMMediaStream *stream, ER&)
 {
   mState->mStream = stream;
 
@@ -342,7 +375,7 @@ PCObserver::OnAddStream(nsIDOMMediaStream *stream, ER&)
     Fake_MediaStream* ms = reinterpret_cast<Fake_MediaStream*>(fake->GetStream());
     Fake_SourceMediaStream* sms = ms->AsSourceStream();
     if (sms) {
-      mozilla::RefPtr<Fake_VideoSink> sink = new VideoSink(mState);
+      nsRefPtr<Fake_VideoSink> sink = new VideoSink(mState);
       sms->AddVideoSink(sink);
     }
   }
@@ -364,7 +397,7 @@ PCObserver::OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER
     gen.openMap();
     gen.addPair("candidate", std::string(cand));
     gen.addPair("sdpMid", std::string(mid));
-    gen.addPair("sdpMLineIndex", (int)level - 1);
+    gen.addPair("sdpMLineIndex", (int)level);
     gen.closeMap();
     std::string value;
     if (gen.getJSON(value)) {
@@ -386,7 +419,7 @@ PCObserver::OnIceCandidate(uint16_t level, const char *mid, const char *cand, ER
 }
 
 NS_IMETHODIMP
-PullTimer::Notify(media::Timer *timer)
+PullTimer::Notify(nsITimer *timer)
 {
   if (mState.get()) {
     Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mState->mStream.get());
@@ -429,7 +462,7 @@ ProcessMessage::Run()
       int index = 0;
       if (parse.find("candidate", candidate) && parse.find("sdpMid", mid) && parse.find("sdpMLineIndex", index)) {
         if (candidate[0] != '\0') {
-          mState->mPeerConnection->AddIceCandidate(candidate.c_str(), mid.c_str(), (unsigned short)index + 1);
+          mState->mPeerConnection->AddIceCandidate(candidate.c_str(), mid.c_str(), (unsigned short)index);
         }
         else {
           LOG("ERROR: Received NULL ice candidate:\n%s\n", message.c_str());
@@ -469,7 +502,7 @@ CheckPRError(PRStatus result)
 int
 main(int argc, char* argv[])
 {
-  media::Initialize();
+  NS_InitXPCOMRT();
   NSS_NoDB_Init(nullptr);
   NSS_SetDomesticPolicy();
   mozilla::RefPtr<State> state = new State;
@@ -492,6 +525,7 @@ main(int argc, char* argv[])
   CheckPRError(PR_Bind(sock, &addr));
 
   if (CheckPRError(PR_Listen(sock, 5))) {
+    LOG("GOT SOCKET!\n");
     state->mSocket = PR_Accept(sock, &addr, PR_INTERVAL_NO_TIMEOUT);
     PR_Shutdown(sock, PR_SHUTDOWN_BOTH);
     PR_Close(sock);
@@ -506,24 +540,27 @@ main(int argc, char* argv[])
     exit(-1);
   }
 
-  sipcc::IceConfiguration cfg;
+  mozilla::IceConfiguration cfg;
 
-  state->mPeerConnection = sipcc::PeerConnectionImpl::CreatePeerConnection();
+  state->mPeerConnection = mozilla::PeerConnectionImpl::CreatePeerConnection();
   state->mPeerConnectionObserver = new PCObserver(state);
   state->mPeerConnection->Initialize(*(state->mPeerConnectionObserver), nullptr, cfg, NS_GetCurrentThread());
 
-  mozilla::RefPtr<media::Timer> timer = media::CreateTimer();;
+  nsresult rv;
+
+  nsCOMPtr<nsITimer> timer = do_CreateInstance(NS_TIMER_CONTRACTID, &rv);
   mozilla::RefPtr<PullTimer> pull = new PullTimer(state);
 
   timer->InitWithCallback(
     pull,
     PR_MillisecondsToInterval(16),
-    media::Timer::TYPE_REPEATING_PRECISE);
+    nsITimer::TYPE_REPEATING_PRECISE);
 
   mozilla::RefPtr<SocketHandler> handler = new SocketHandler(state);
   mozilla::RefPtr<DispatchSocketHandler> dispatch = new DispatchSocketHandler(state->mSocket, handler);
-  mozilla::RefPtr<media::EventTarget> sts = media::GetSocketTransportServiceTarget();
-  sts->Dispatch(dispatch, MEDIA_DISPATCH_NORMAL);
+  nsCOMPtr<nsISocketTransportService> sts = do_GetService(NS_SOCKETTRANSPORTSERVICE_CONTRACTID, &rv);
+  nsCOMPtr<nsIEventTarget> ststhread = do_QueryInterface(sts, &rv);
+  ststhread->Dispatch(dispatch, NS_DISPATCH_NORMAL);
 
   render::Initialize();
   while (render::KeepRunning()) { NS_ProcessNextEvent(nullptr, true); }
@@ -534,7 +571,7 @@ main(int argc, char* argv[])
   state->mPeerConnection = nullptr;
 
   render::Shutdown();
-  media::Shutdown();
+  NS_ShutdownXPCOMRT();
 
   return 0;
 }
