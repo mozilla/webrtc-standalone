@@ -521,7 +521,6 @@ main(int argc, char* argv[])
   CheckPRError(PR_Bind(sock, &addr));
 
   if (CheckPRError(PR_Listen(sock, 5))) {
-    LOG("GOT SOCKET!\n");
     state->mSocket = PR_Accept(sock, &addr, PR_INTERVAL_NO_TIMEOUT);
     PR_Shutdown(sock, PR_SHUTDOWN_BOTH);
     PR_Close(sock);
