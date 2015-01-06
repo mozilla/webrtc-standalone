@@ -136,11 +136,36 @@ LFLAGS = \
 -framework ExceptionHandling \
 -Wl,-executable_path,$(GECKO_OBJ)/dist/bin \
 -Wl,-rpath,$(GECKO_OBJ)/dist/bin \
+$(GECKO_OBJ)/dist/lib/libssl.a \
+$(GECKO_OBJ)/dist/lib/libplc4.a \
+$(GECKO_OBJ)/dist/lib/libnspr4.a \
+$(GECKO_OBJ)/dist/lib/libcertdb.a \
+$(GECKO_OBJ)/dist/lib/libcerthi.a \
+$(GECKO_OBJ)/dist/lib/libcryptohi.a \
+$(GECKO_OBJ)/dist/lib/libpkixpki.a \
+$(GECKO_OBJ)/dist/lib/libpkixtop.a \
+$(GECKO_OBJ)/dist/lib/libpkixchecker.a \
+$(GECKO_OBJ)/dist/lib/libpkixstore.a \
+$(GECKO_OBJ)/dist/lib/libpkixcrlsel.a \
+$(GECKO_OBJ)/dist/lib/libpkixpki.a \
+$(GECKO_OBJ)/dist/lib/libpkixresults.a \
+$(GECKO_OBJ)/dist/lib/libpkixutil.a \
+$(GECKO_OBJ)/dist/lib/libpkixparams.a \
+$(GECKO_OBJ)/dist/lib/libpkixcertsel.a \
+$(GECKO_OBJ)/dist/lib/libpkixsystem.a \
+$(GECKO_OBJ)/dist/lib/libpkixchecker.a \
+$(GECKO_OBJ)/dist/lib/libpkixmodule.a \
+$(GECKO_OBJ)/dist/lib/libnsspki.a \
+$(GECKO_OBJ)/dist/lib/libnssdev.a \
+$(GECKO_OBJ)/dist/lib/libnssb.a \
+$(GECKO_OBJ)/dist/lib/libnss.a \
+$(GECKO_OBJ)/dist/lib/libcerthi.a \
+$(GECKO_OBJ)/dist/lib/libsmime.a \
+$(GECKO_OBJ)/dist/lib/libnssutil.a \
+$(GECKO_OBJ)/dist/lib/libplds4.a \
+$(GECKO_OBJ)/dist/lib/libplc4.a \
+$(GECKO_OBJ)/dist/lib/libsoftokn.a \
 -lcrmf \
--lnss3 \
--lnspr4 \
--lssl3 \
--lnssutil3 \
 -framework QTKit \
 -framework QuartzCore \
 -framework Security \

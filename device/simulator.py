@@ -46,8 +46,8 @@ class ECPRestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
   def do_POST(self):
     print 'do_POST: ' + self.path
     if self.path == '/launch/99999':
-#      pc = Popen(['../glplayer',])
-      print 'LAUNCH!!!!!'
+#      print 'LAUNCH!!!!!'
+      pc = Popen(['../glplayer',])
       self.send_response(200)
     else:
       self.send_response(500)
