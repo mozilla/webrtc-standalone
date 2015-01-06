@@ -187,8 +187,8 @@ Initialize()
   glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, 0, texcoord);
 }
 
-const int MaxWidth = 800;
-const int MaxHeight = 600;
+// const int MaxWidth = 800;
+// const int MaxHeight = 600;
 
 void
 Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)

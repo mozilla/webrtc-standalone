@@ -70,6 +70,7 @@ CFLAGS = \
 -Wno-extended-offsetof \
 -Wno-unknown-warning-option \
 -Wno-return-type-c-linkage \
+-Wno-inline-new-delete \
 -fno-exceptions \
 -fno-strict-aliasing \
 -fno-rtti \
