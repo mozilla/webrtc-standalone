@@ -45,13 +45,13 @@ $(BUILD_DIR)/player.o \
 $(BUILD_DIR)/json.o
 
 player: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderSDL2.o $(JSON)
-	$(CXX) $(OBJS) $(BUILD_DIR)/renderSDL2.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderSDL2.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) $(LIB_ROLLUP) -o $@
 
 glplayer: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderGL.o $(JSON)
-	$(CXX) $(OBJS) $(BUILD_DIR)/renderGL.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderGL.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) $(LIB_ROLLUP) -o $@
 
 stubplayer: $(OBJS) $(LIB_ROLLUP) $(BUILD_DIR)/renderStub.o $(JSON)
-	$(CXX) $(OBJS) $(BUILD_DIR)/renderStub.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) -o $@
+	$(CXX) $(OBJS) $(BUILD_DIR)/renderStub.o $(LIB_ROLLUP) $(JSON) $(SDL_LFLAGS) $(LFLAGS) $(LIB_ROLLUP) -o $@
 
 $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(BUILD_DIR)
