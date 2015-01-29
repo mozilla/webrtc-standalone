@@ -219,19 +219,24 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
       sHeight = tHeight;
     }
 
-//fprintf(stderr, "Got %d x %d size: %d using: %d x %d\n", aWidth, aHeight, size, tWidth, tHeight);
 
     const unsigned char* chanY = aImage;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, aWidth);
     glBindTexture(GL_TEXTURE_2D, textureY);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth, aHeight, 0, GL_RED, GL_UNSIGNED_BYTE, chanY);
 
     const unsigned char* chanU = aImage + (aWidth * aHeight);
-    glBindTexture(GL_TEXTURE_2D, textureU);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanU);
+    const int halfWidth = (aWidth + 1) / 2;
+    const int halfHeight = (aHeight + 1) / 2;
 
-    const unsigned char* chanV = aImage + (aWidth * aHeight) + (aWidth * aHeight / 4); //  + (aWidth / 4);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, halfWidth);
+    glBindTexture(GL_TEXTURE_2D, textureU);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, halfWidth, halfHeight, 0, GL_RED, GL_UNSIGNED_BYTE, chanU);
+
+    const unsigned char* chanV = aImage + (aWidth * aHeight) + (halfWidth * halfHeight);
     glBindTexture(GL_TEXTURE_2D, textureV);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, aWidth / 2, aHeight / 2, 0, GL_RED, GL_UNSIGNED_BYTE, chanV);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, halfWidth, halfHeight, 0, GL_RED, GL_UNSIGNED_BYTE, chanV);
 
     glClearColor ( 0.0, 0.0, 0.0, 1.0 );
     glClear ( GL_COLOR_BUFFER_BIT );
