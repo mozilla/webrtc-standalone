@@ -29,6 +29,7 @@ $(GECKO_OBJ)/intl/unicharutil/util/standalone/libunicharutil_standalone.a.desc \
 $(GECKO_OBJ)/security/nss/lib/pk11wrap/static/libpk11wrap_s.a.desc \
 $(GECKO_OBJ)/security/nss/lib/freebl/static/libfreebl_s.a.desc \
 $(GECKO_OBJ)/db/sqlite3/src/libdb_sqlite3_src.a.desc \
+$(GECKO_OBJ)/memory/fallible/libfallible.a.desc \
 $(GECKO_OBJ)/media/libyuv/libyuv_libyuv/libyuv.a.desc
 
 LIB_ROLLUP = $(BUILD_DIR)/librollup.a
