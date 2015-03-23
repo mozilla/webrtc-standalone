@@ -171,7 +171,7 @@ $(GECKO_OBJ)/dist/lib/libsoftokn.a \
 -framework QuartzCore \
 -framework Security \
 -framework SystemConfiguration \
--lmozalloc
+-lmozglue
 
 CFLAGS+=-I$(SDL_INCLUDE_PATH) -D_THREAD_SAFE -DDARWIN_GL
 LFLAGS+=-L$(SDL_LIB_PATH) \

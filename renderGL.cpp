@@ -212,6 +212,7 @@ Draw(const unsigned char* aImage, int size, int aWidth, int aHeight)
 #endif
 
     if ((tWidth != sWidth) || (tHeight != sHeight)) {
+fprintf(stderr, "Width: %d Height: %d\n", tWidth, tHeight);
 
       SDL_SetWindowSize(mainwindow, tWidth, tHeight);
       glViewport(0, 0, tWidth, tHeight);

@@ -147,12 +147,13 @@ public:
   NS_IMETHODIMP NotifyClosedConnection(ER&) { return NS_OK; }
   NS_IMETHODIMP NotifyDataChannel(nsIDOMDataChannel *channel, ER&) { return NS_OK; }
   NS_IMETHODIMP OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, void*);
-  NS_IMETHODIMP OnAddStream(mozilla::DOMMediaStream *stream, ER&);
-  NS_IMETHODIMP OnRemoveStream(ER&);
+  NS_IMETHODIMP OnAddStream(mozilla::DOMMediaStream& stream, ER&);
+  NS_IMETHODIMP OnRemoveStream(mozilla::DOMMediaStream&, ER&);
   NS_IMETHODIMP OnReplaceTrackSuccess(ER&) { return NS_OK; }
   NS_IMETHODIMP OnReplaceTrackError(uint32_t code, const char *msg, ER&) { return NS_OK; }
-  NS_IMETHODIMP OnAddTrack(ER&) { return NS_OK; }
-  NS_IMETHODIMP OnRemoveTrack(ER&) { return NS_OK; }
+  NS_IMETHODIMP OnAddTrack(mozilla::MediaStreamTrack&, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnRemoveTrack(mozilla::MediaStreamTrack&, ER&) { return NS_OK; }
+  NS_IMETHODIMP OnNegotiationNeeded(ER&) { return NS_OK; }
   NS_IMETHODIMP OnAddIceCandidateSuccess(ER&)
   {
     LOG("OnAddIceCandidateSuccessn\n");
@@ -362,9 +363,9 @@ PCObserver::OnStateChange(mozilla::dom::PCObserverStateType state_type, ER&, voi
 
 
 NS_IMETHODIMP
-PCObserver::OnAddStream(mozilla::DOMMediaStream *stream, ER&)
+PCObserver::OnAddStream(mozilla::DOMMediaStream &stream, ER&)
 {
-  mState->mStream = stream;
+  mState->mStream = &stream;
 
   Fake_DOMMediaStream* fake = reinterpret_cast<Fake_DOMMediaStream*>(mState->mStream.get());
   if (fake) {
@@ -379,7 +380,7 @@ PCObserver::OnAddStream(mozilla::DOMMediaStream *stream, ER&)
 }
 
 NS_IMETHODIMP
-PCObserver::OnRemoveStream(ER&)
+PCObserver::OnRemoveStream(mozilla::DOMMediaStream&, ER&)
 {
   // Not being called?
   return NS_OK;

@@ -107,7 +107,7 @@ LFLAGS = \
 -lXdamage \
 -lXfixes \
 -lX11 \
--lmozalloc \
+-lmozglue \
 -ldl
 
 #$(GECKO_OBJ)/memory/mozalloc/Unified_cpp_memory_mozalloc0.o \
